@@ -14,7 +14,7 @@ def evaluate(game, agents, num_evaluations):
     points_history = [[] for _ in range(len(agents))]
 
     for _ in range(num_evaluations):
-        game_winner_id, winner_points = brisc.play_episode(game, agents, train=False)
+        game_winner_id, winner_points, _ = brisc.play_episode(game, agents, train=False)
         for player in game.players:
             points_history[player.id].append(player.points)
             if player.id == game_winner_id:

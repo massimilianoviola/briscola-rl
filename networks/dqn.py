@@ -44,16 +44,16 @@ class DQN(nn.Module):
     """
     Simple feed-forward neural network with two fully connected layers
     """
-    def __init__(self, input_dim, output_dim, activation):
+    def __init__(self, input_dim, output_dim, layers=[64, 64], activation=nn.ReLU()):
         """
         :param input_dim: size of the state vector
         :param output_dim: number of possible actions
         :param activation: activation function for the hidden layers
         """
         super().__init__()
-        self.fc1 = nn.Linear(in_features=input_dim, out_features=256)
-        self.fc2 = nn.Linear(in_features=256, out_features=128)
-        self.out = nn.Linear(in_features=128, out_features=output_dim)
+        self.fc1 = nn.Linear(in_features=input_dim, out_features=layers[0])
+        self.fc2 = nn.Linear(in_features=layers[0], out_features=layers[1])
+        self.out = nn.Linear(in_features=layers[1], out_features=output_dim)
         self.act = activation
 
     def forward(self, x):

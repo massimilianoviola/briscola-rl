@@ -13,6 +13,9 @@ class BriscolaCard:
         self.strength = -1  # card rank during the game [0, 9]
         self.points = -1    # point value of the card [0, 11]
 
+    def __str__(self):
+        return self.name
+
 
 class BriscolaDeck:
     """Initialize a deck of Briscola cards with its attributes."""
@@ -79,6 +82,14 @@ class BriscolaDeck:
         current_deck_size += 1 if self.briscola else 0
         return current_deck_size
 
+    def __len__(self):
+        return len(self.current_deck)
+
+    def __str__(self):
+        str_ = ""
+        for el in self.current_deck:
+            str_ += el.__str__() + ", "
+        return str_
 
 class BriscolaPlayer:
     """Create basic player actions."""
@@ -117,6 +128,7 @@ class BriscolaGame:
         self.num_players = num_players
         self.deck = BriscolaDeck()
         self.logger = logger
+        self.won_the_match_points = False
 
     def reset(self):
         """Start a new game."""
@@ -138,6 +150,8 @@ class BriscolaGame:
         for _ in range(0, 3):
             for i in self.players_order:
                 self.players[i].draw(self.deck)
+
+        self.won_the_match_points = False
 
     def reorder_hand(self, player_id):
         """Rearrange the cards in a player's hand from strongest to weakest, 
@@ -192,12 +206,30 @@ class BriscolaGame:
         winner_player_id, points = self.evaluate_step()
 
         rewards = []
+        extra_points = 100 # Points for winning
+        count = 0
         for player_id in self.get_players_order():
             reward = points if player_id is winner_player_id else -points
             #reward = points if player_id is winner_player_id else 0
 
+
+            # Reward for winning the match
+
+            player = self.players[player_id]
+            if self.won_the_match_points == False: 
+                if player.points >= 60 and reward > 0:
+                    #print(f"PLAYER POINTS {player.points}")
+                    reward += extra_points
+                    self.won_the_match_points = True
+                    if count == 0:
+                        return [reward, -reward]
+                    else:
+                        return [-reward, reward]
+            
+            count += 1
             rewards.append(reward)
 
+        #print(rewards)
         return rewards
 
     def evaluate_step(self):
@@ -311,25 +343,55 @@ def scoring(briscola_seed, card_0, card_1, keep_order=True):
 def play_episode(game, agents, train=True):
     """Play an entire game updating the environment at each step."""
     game.reset()
+    rewards_log = []
     rewards = []
     while not game.check_end_game():
         # action step
         players_order = game.get_players_order()
+        
+        #print("-"*140)
+
         for i, player_id in enumerate(players_order):
             player = game.players[player_id]
             agent = agents[player_id]
+
+            #print(f"{agent.name} turn")
+
             # the agent observes the state before acting
             agent.observe(game, player)
-
+           
             if train and rewards:
                 agent.update(rewards[i])
+                if agent.name == "QLearningAgent":
+                    rewards_log.append(rewards[i])
 
             available_actions = game.get_player_actions(player_id)
             action = agent.select_action(available_actions)
+            
+
+            #if agent.name == "QLearningAgent":
+                #print(f"{agent.name} state {agent.state}")
+
+            #print(f"{agent.name} plays {player.hand[action]} ({action})")
+            
             game.play_step(action, player_id)
+
+            # Update agents deck since it can only observe the environment when it's its turn
+            # So for example if it's the first one to play he can only exclude the card he played
+            # and the one played by the opponent. In the next turn played_cards will be empty.
+            for card in game.played_cards:
+                agents[0].deck[card.number][card.seed] = 1
+        
+        #print("PLAYED:")
+        #for card in game.played_cards:
+           # print(card)
 
         # update the environment
         rewards = game.get_rewards_from_step()
+
+        #for i, player_id in enumerate(game.get_players_order()):
+            #print(f"{agents[player_id].name} gets reward {rewards[i]}")
+
         game.draw_step()
 
     # update for the terminal state
@@ -340,4 +402,4 @@ def play_episode(game, agents, train=True):
         if train and rewards:
             agent.update(rewards[i])
 
-    return game.end_game()
+    return *game.end_game(), rewards_log
