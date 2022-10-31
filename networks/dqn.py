@@ -6,9 +6,8 @@ from collections import deque
 
 
 class ReplayMemory(object):
-    """
-    Implements an experience replay memory
-    """
+    """Implements an experience replay memory"""
+
     def __init__(self, capacity):
         """
         :param capacity: capacity of the experience replay memory
@@ -22,8 +21,7 @@ class ReplayMemory(object):
         return len(self.memory)
 
     def push(self, state, action, reward, next_state, done):
-        """
-        Stores a tuple (s, a, r, s', done)
+        """Stores a tuple (s, a, r, s', done)
         :param state: current state s
         :param action: action taken a
         :param reward: reward r obtained taking action a being in state s
@@ -41,10 +39,9 @@ class ReplayMemory(object):
 
 
 class DQN(nn.Module):
-    """
-    Simple feed-forward neural network with two fully connected layers
-    """
-    def __init__(self, input_dim, output_dim, layers=[64, 64], activation=nn.ReLU()):
+    """Simple feed-forward neural network with two fully connected layers"""
+    def __init__(self, input_dim, output_dim, layers=[64, 64],
+                 activation=nn.ReLU()):
         """
         :param input_dim: size of the state vector
         :param output_dim: number of possible actions

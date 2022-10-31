@@ -12,22 +12,25 @@ class HumanAgent:
         self.briscola = game.briscola
         self.played_cards = game.played_cards
 
-    def select_action(self, actions):
-        """Parse user input from the keyboard. 
+    def select_action(self, actions, render=False):
+        """Parse user input from the keyboard.
         If it's not a valid action index, do something random.
         """
-        print("Your turn!")
-        print(f"The briscola is {self.briscola.name}.")
-        print(f"Your hand is: {[card.name for card in self.hand]}.")
+        if not render:
+            print("Your turn!")
+            print(f"The briscola is {self.briscola.name}.")
+            print(f"Your hand is: {[card.name for card in self.hand]}.")
 
-        try:
-            action = int(input('Input: '))
-        except ValueError:
-            print("Error, not a number!!")
-            action = random.choice(actions)
+            try:
+                action = int(input('Input: '))
+            except ValueError:
+                print("Error, not a number!!")
+                action = random.choice(actions)
 
-        if action not in actions:
-            print("Error, out of bounds action selected!!")
+            if action not in actions:
+                print("Error, out of bounds action selected!!")
+                action = random.choice(actions)
+        else:
             action = random.choice(actions)
 
         return action

@@ -3,7 +3,7 @@ from statistics import mean
 from agents.random_agent import RandomAgent
 from agents.ai_agent import AIAgent
 from agents.q_agent import QAgent
-# from graphic_visualizations import stats_plotter
+from graphic_visualizations import stats_plotter
 import environment as brisc
 from utils import BriscolaLogger, NetworkTypes
 

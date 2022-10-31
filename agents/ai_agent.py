@@ -109,3 +109,9 @@ class AIAgent:
 
     def restore_epsilon(self):
         pass
+
+    def save(self, path):
+        pass
+
+    def load(self, path):
+        pass
