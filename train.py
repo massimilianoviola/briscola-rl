@@ -15,11 +15,11 @@ from utils import BriscolaLogger
 def train(
     game,
     agents,
-    num_epochs,
-    evaluate_every,
-    num_evaluations,
-    save=False,
-    save_dir="",
+    num_epochs: int,
+    evaluate_every: int,
+    num_evaluations: int,
+    save: bool = False,
+    save_dir: str = "",
 ):
     """The agent is trained for num_epochs number of episodes following an
     epsilon-greedy policy. Every evaluate_every number of episodes the agent
