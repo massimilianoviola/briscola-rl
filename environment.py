@@ -6,12 +6,12 @@ class BriscolaCard:
     """Create a Briscola card with its attributes."""
 
     def __init__(self):
-        self.id = -1        # index of the one-hot encoded card in the deck [0, len(deck) - 1]
-        self.name = ''      # name to display
-        self.seed = -1      # seed/suit of the card [0, 3]
-        self.number = -1    # face value of the card [0, 9]
+        self.id = -1  # index of the one-hot encoded card in the deck [0, len(deck) - 1]
+        self.name = ""  # name to display
+        self.seed = -1  # seed/suit of the card [0, 3]
+        self.number = -1  # face value of the card [0, 9]
         self.strength = -1  # card rank during the game [0, 9]
-        self.points = -1    # point value of the card [0, 11]
+        self.points = -1  # point value of the card [0, 11]
 
     def __str__(self):
         return self.name
@@ -28,8 +28,19 @@ class BriscolaDeck:
         """Create all the BriscolaCards and add them to the deck."""
         points = [11, 0, 10, 0, 0, 0, 0, 2, 3, 4]
         strengths = [9, 0, 8, 1, 2, 3, 4, 5, 6, 7]
-        seeds = ['Bastoni', 'Coppe', 'Denari', 'Spade']
-        names = ['Asso', 'Due', 'Tre', 'Quattro', 'Cinque', 'Sei', 'Sette', 'Fante', 'Cavallo', 'Re']
+        seeds = ["Bastoni", "Coppe", "Denari", "Spade"]
+        names = [
+            "Asso",
+            "Due",
+            "Tre",
+            "Quattro",
+            "Cinque",
+            "Sei",
+            "Sette",
+            "Fante",
+            "Cavallo",
+            "Re",
+        ]
 
         self.deck = []
         id = 0
@@ -59,13 +70,15 @@ class BriscolaDeck:
     def place_briscola(self, briscola):
         """Set a card as briscola and allow to draw it after the last card of the deck."""
         if self.briscola is not None:
-            raise ValueError("Trying BriscolaDeck.place_briscola, but BriscolaDeck.briscola is not None")
+            raise ValueError(
+                "Trying BriscolaDeck.place_briscola, but BriscolaDeck.briscola is not None"
+            )
         self.briscola = briscola
 
     def draw_card(self):
         """If the deck is not empty, draw a card, otherwise return the briscola or nothing."""
         if self.current_deck:
-            drawn_card =  self.current_deck.pop()
+            drawn_card = self.current_deck.pop()
         else:
             drawn_card = self.briscola
             self.briscola = None
@@ -91,6 +104,7 @@ class BriscolaDeck:
             str_ += el.__str__() + ", "
         return str_
 
+
 class BriscolaPlayer:
     """Create basic player actions."""
 
@@ -109,7 +123,9 @@ class BriscolaPlayer:
         if new_card is not None:
             self.hand.append(new_card)
         if len(self.hand) > 3:
-            raise ValueError("Calling BriscolaPlayer.draw caused the player to have more than 3 cards in hand!")
+            raise ValueError(
+                "Calling BriscolaPlayer.draw caused the player to have more than 3 cards in hand!"
+            )
 
     def play_card(self, hand_index):
         """Try to play a card from the hand and return the chosen card or an exception if invalid index."""
@@ -163,12 +179,17 @@ class BriscolaGame:
         """
         player = self.players[player_id]
         # bubble sort algorithm using scoring() as a comparator
-        for passnum in range(len(player.hand)-1, 0, -1):
+        for passnum in range(len(player.hand) - 1, 0, -1):
             for i in range(passnum):
-                if scoring(self.briscola.seed, player.hand[i], player.hand[i+1], keep_order=False):
+                if scoring(
+                    self.briscola.seed,
+                    player.hand[i],
+                    player.hand[i + 1],
+                    keep_order=False,
+                ):
                     temp = player.hand[i]
-                    player.hand[i] = player.hand[i+1]
-                    player.hand[i+1] = temp
+                    player.hand[i] = player.hand[i + 1]
+                    player.hand[i + 1] = temp
 
     def get_player_actions(self, player_id):
         """Get the list of available actions for a player."""
@@ -177,7 +198,10 @@ class BriscolaGame:
 
     def get_players_order(self):
         """Compute the clockwise players order starting from the current turn player."""
-        players_order = [ i % self.num_players for i in range(self.turn_player, self.turn_player + self.num_players)]
+        players_order = [
+            i % self.num_players
+            for i in range(self.turn_player, self.turn_player + self.num_players)
+        ]
         return players_order
 
     def draw_step(self):
@@ -194,7 +218,9 @@ class BriscolaGame:
         """A player executes a chosen action."""
         player = self.players[player_id]
 
-        self.logger.DEBUG(f"Player {player_id} hand: {[card.name for card in player.hand]}.")
+        self.logger.DEBUG(
+            f"Player {player_id} hand: {[card.name for card in player.hand]}."
+        )
         self.logger.DEBUG(f"Player {player_id} chose action {action}.")
 
         card = player.play_card(action)
@@ -237,14 +263,18 @@ class BriscolaGame:
 
     def evaluate_step(self):
         """Look at the cards played and decide which player won the hand."""
-        ordered_winner_id, strongest_card = get_strongest_card(self.briscola.seed, self.played_cards)
+        ordered_winner_id, strongest_card = get_strongest_card(
+            self.briscola.seed, self.played_cards
+        )
         winner_player_id = self.players_order[ordered_winner_id]
 
         points = sum([card.points for card in self.played_cards])
         winner_player = self.players[winner_player_id]
 
         self.update_game(winner_player, points)
-        self.logger.PVP(f"Player {winner_player_id} wins {points} points with {strongest_card.name}.")
+        self.logger.PVP(
+            f"Player {winner_player_id} wins {points} points with {strongest_card.name}."
+        )
 
         return winner_player_id, points
 
@@ -274,7 +304,9 @@ class BriscolaGame:
     def end_game(self):
         """End the game and return the winner."""
         if not self.check_end_game():
-            raise ValueError("Calling BriscolaGame.end_game when the game has not ended!")
+            raise ValueError(
+                "Calling BriscolaGame.end_game when the game has not ended!"
+            )
 
         winner_player_id, winner_points = self.get_winner()
         self.logger.PVP(f"Player {winner_player_id} wins with {winner_points} points!!")
@@ -299,7 +331,7 @@ def get_strongest_card(briscola_seed, cards):
     strongest_card = cards[0]
 
     for ordered_id, card in enumerate(cards[1:]):
-        ordered_id += 1 # adjustment since we are starting from the first element
+        ordered_id += 1  # adjustment since we are starting from the first element
         pair_winner = scoring(briscola_seed, strongest_card, card)
         if pair_winner == 1:
             ordered_winner_id = ordered_id
@@ -316,7 +348,7 @@ def get_weakest_card(briscola_seed, cards):
     weakest_card = cards[0]
 
     for ordered_id, card in enumerate(cards[1:]):
-        ordered_id += 1 # adjustment since we are starting from the first element
+        ordered_id += 1  # adjustment since we are starting from the first element
         pair_winner = scoring(briscola_seed, weakest_card, card, keep_order=False)
         if pair_winner == 0:
             ordered_loser_id = ordered_id
@@ -345,9 +377,12 @@ def scoring(briscola_seed, card_0, card_1, keep_order=True):
 
 
 def play_episode(game, agents, train=True):
-    """Play an entire game updating the environment at each step."""
+    """Play an entire game updating the environment at each step.
+    rewards_log will contain as key the agent's name and as value a list
+    containing all the rewards that the agent has received at each step.
+    """
     game.reset()
-    rewards_log = []
+    rewards_log = {agent.name: [] for agent in agents}
     rewards = []
     while not game.check_end_game():
         # action step
@@ -366,15 +401,13 @@ def play_episode(game, agents, train=True):
 
             if train and rewards:
                 agent.update(rewards[i])
-                if agent.name == "QLearningAgent":
-                    rewards_log.append(rewards[i])
+                rewards_log[agent.name].append(rewards[i])
 
             available_actions = game.get_player_actions(player_id)
             action = agent.select_action(available_actions)
 
-
             # if agent.name == "QLearningAgent":
-                # print(f"{agent.name} state {agent.state}")
+            # print(f"{agent.name} state {agent.state}")
 
             # print(f"{agent.name} plays {player.hand[action]} ({action})")
 
@@ -390,13 +423,13 @@ def play_episode(game, agents, train=True):
 
         # print("PLAYED:")
         # for card in game.played_cards:
-            # print(card)
+        # print(card)
 
         # update the environment
         rewards = game.get_rewards_from_step()
 
         # for i, player_id in enumerate(game.get_players_order()):
-            # print(f"{agents[player_id].name} gets reward {rewards[i]}")
+        # print(f"{agents[player_id].name} gets reward {rewards[i]}")
 
         game.draw_step()
 

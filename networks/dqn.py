@@ -79,6 +79,7 @@ class DRQN(nn.Module):
         num_recurrent_layers: int,
         fc_size: int = 256,
         fc_activation=nn.ReLU(),
+        dropout_rate: float = 0.5,
     ) -> None:
         """"""
         super().__init__()
@@ -86,12 +87,14 @@ class DRQN(nn.Module):
         self.rnn = nn.LSTM(
             input_dim, hidden_size, num_recurrent_layers, batch_first=True
         )
+        self.dropout = nn.Dropout(dropout_rate)
         self.fc1 = nn.Linear(hidden_size, fc_size)
         self.out = nn.Linear(fc_size, output_dim)
         self.act = fc_activation
 
     def forward(self, x: Tensor, h: Tensor, c: Tensor) -> Tensor:
         x, h = self.rnn(x, (h, c))
+        x = self.dropout(x)
         x = self.act(self.fc1(x))
         x = self.out(x)
         return x, h
