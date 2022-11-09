@@ -8,16 +8,37 @@ from agents.ai_agent import AIAgent
 from evaluate import evaluate
 from utils import BriscolaLogger
 import environment as brisc
+import torch.optim as optim
 
 
 def objective(trial):
     logger = BriscolaLogger(BriscolaLogger.LoggerLevels.TRAIN)
     game = brisc.BriscolaGame(2, logger)
 
-    recurrent_layer_size = 256#trial.suggest_int("recurrent_layer_size", 64, 256)
-    fully_connected_size = 256#trial.suggest_int("fully_connected_size", 64, 256)
-    lr = trial.suggest_loguniform("lr", 1e-8, 1e-1)
-    replace_every = 1000 #trial.suggest_int("replace_every", 100, 2000)
+    recurrent_layer_size = trial.suggest_categorical(
+        "recurrent_layer_size",
+        [32, 64, 128, 256],
+    )
+
+    fully_connected_size = trial.suggest_categorical(
+        "fully_connected_size",
+        [32, 64, 128, 256],
+    )
+
+    optimizer = trial.suggest_categorical(
+        "optimizer",
+        ["SGD", "RMSprop", "Adam"],
+    )
+
+    lr = trial.suggest_float("lr", 1e-8, 1e-1)
+    replace_every = trial.suggest_int("replace_every", 100, 1000)
+
+    if optimizer == "SGD":
+        opt = optim.SGD
+    elif optimizer == "RMSprop":
+        opt = optim.RMSprop
+    else:
+        opt = optim.Adam
 
     # Initialize agents
     agents = []
@@ -36,6 +57,7 @@ def objective(trial):
         epsilon_decay_rate=0.999998,
         hidden_size=recurrent_layer_size,
         fully_connected_layers=fully_connected_size,
+        optimizer=opt,
     )
 
     agents.append(agent)
@@ -44,9 +66,12 @@ def objective(trial):
     torch.manual_seed(0)
     np.random.seed(0)
     random.seed(0)
+
     num_epochs = 1000
-    evaluate_every = 100
-    num_evaluations = 100
+    evaluate_every = 250
+    num_evaluations = 200
+
+    winrates = []
     for epoch in range(1, num_epochs + 1):
         print(f"Episode: {epoch} epsilon: {agents[0].epsilon:.6f}", end="\r")
 
@@ -59,6 +84,7 @@ def objective(trial):
                 agent.make_greedy()
             total_wins, points_history = evaluate(game, agents, num_evaluations)
             current_winrate = total_wins[0] / (total_wins[0] + total_wins[1])
+            winrates.append(current_winrate)
             for agent in agents:
                 agent.restore_epsilon()
 
@@ -67,11 +93,11 @@ def objective(trial):
             agents[0].target_net.load_state_dict(
                 agents[0].policy_net.state_dict(),
             )
-    return current_winrate
+    return max(winrates)
 
 
 study = optuna.create_study(study_name="DRQN", direction="maximize")
-study.optimize(objective, n_trials=10)
+study.optimize(objective, n_trials=100)
 
 print("BEST TRIAL:")
 trial = study.best_trial

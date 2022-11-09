@@ -26,15 +26,16 @@ def train():
         epsilon=1.0,
         minimum_epsilon=0.1,
         replay_memory_capacity=1000000,
-        minimum_training_samples=2000,
-        batch_size=256,
+        minimum_training_samples=100,
+        batch_size=32,
         discount=0.95,
         loss_fn=torch.nn.SmoothL1Loss(),
-        learning_rate=0.001,
-        replace_every=1000,
+        learning_rate=0.01,
+        replace_every=500,
         epsilon_decay_rate=0.999998,
         hidden_size=256,
         fully_connected_layers=256,
+        optimizer=torch.optim.Adam
     )
 
     agents.append(agent)
