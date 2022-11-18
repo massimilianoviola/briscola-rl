@@ -18,6 +18,14 @@ def train():
     logger = BriscolaLogger(BriscolaLogger.LoggerLevels.TRAIN)
     game = brisc.BriscolaGame(2, logger)
 
+    seed = 0
+
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+
+    replace_every = 500
     # Initialize agents
     agents = []
     agent = RecurrentDeepQAgent(
@@ -26,26 +34,25 @@ def train():
         epsilon=1.0,
         minimum_epsilon=0.1,
         replay_memory_capacity=1000000,
-        minimum_training_samples=100,
-        batch_size=32,
+        minimum_training_samples=500,
+        batch_size=64,
         discount=0.95,
         loss_fn=torch.nn.SmoothL1Loss(),
-        learning_rate=0.01,
-        replace_every=500,
+        learning_rate=0.0001,
+        replace_every=replace_every,
         epsilon_decay_rate=0.999998,
-        hidden_size=256,
-        fully_connected_layers=256,
-        optimizer=torch.optim.Adam
+        hidden_size=128,
+        fully_connected_layers=128,
+        optimizer=torch.optim.RMSprop,
+        momentum=.99,
+        sequence_len=4,
     )
 
     agents.append(agent)
     agents.append(RandomAgent())
 
-    torch.manual_seed(0)
-    np.random.seed(0)
-    random.seed(0)
     num_epochs = 25000
-    evaluate_every = 1000
+    evaluate_every = replace_every
     num_evaluations = 1000
     for epoch in range(1, num_epochs + 1):
         print(f"Episode: {epoch} epsilon: {agents[0].epsilon:.6f}", end="\r")
@@ -54,11 +61,12 @@ def train():
             game,
             agents,
         )
+
         if epoch % evaluate_every == 0:
             for agent in agents:
                 agent.make_greedy()
-            total_wins, points_history = evaluate(game, agents, num_evaluations)
 
+            total_wins, points_history = evaluate(game, agents, num_evaluations)
             for agent in agents:
                 agent.restore_epsilon()
 

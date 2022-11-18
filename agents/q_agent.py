@@ -24,9 +24,15 @@ class QAgent:
         minimum_epsilon: float,
         epsilon_decay_rate: float,
         layers: List[int] = [256, 256],
+        device=None,
     ) -> None:
         """"""
         self.name = "QLearningAgent"
+
+        if device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = device
 
         self.n_features = n_features
         self.n_actions = n_actions
@@ -47,8 +53,8 @@ class QAgent:
         self.minimum_training_samples = minimum_training_samples
         self.batch_size = batch_size
 
-        self.policy_net = DQN(n_features, n_actions, layers, nn.ReLU())
-        self.target_net = DQN(n_features, n_actions, layers, nn.ReLU())
+        self.policy_net = DQN(n_features, n_actions, layers).to(self.device)
+        self.target_net = DQN(n_features, n_actions, layers).to(self.device)
 
         self.loss_fn = loss_fn
         self.optimizer = optim.RMSprop(
@@ -201,7 +207,7 @@ class QAgent:
 
     def select_action(self, available_actions):
         """Selects action according to an epsilon-greedy policy"""
-        state = torch.from_numpy(self.state).float()
+        state = torch.from_numpy(self.state).float().to(self.device)
 
         if np.random.uniform() < self.epsilon:
             # Select a random action with probability epsilon
@@ -253,19 +259,23 @@ class QAgent:
         states = torch.tensor(
             np.array([x[0] for x in batch]),
             dtype=torch.float32,
-        )
+        ).to(self.device)
         actions = torch.tensor(
             np.array([x[1] for x in batch]),
             dtype=torch.int64,
-        )
+        ).to(self.device)
         rewards = torch.tensor(
             np.array([x[2] for x in batch]),
             dtype=torch.float32,
-        )
+        ).to(self.device)
         next_states = torch.tensor(
             np.array([x[3] for x in batch]),
             dtype=torch.float32,
-        )
+        ).to(self.device)
+        done = torch.tensor(
+            np.array([x[4] for x in batch]),
+            dtype=torch.bool,
+        ).to(self.device)
 
         self.policy_net.train()
         # computes Q(s, a1), Q(s, a_2), ... , Q(s, a_n)
@@ -281,7 +291,7 @@ class QAgent:
         next_state_max_q = target_q_values.max(dim=1)[0]
 
         # r + discount * Q_max(s)
-        target = rewards + self.discount * next_state_max_q
+        target = rewards + (self.discount * next_state_max_q * (1-done.float()))
         target = target.unsqueeze(1)
 
         loss = self.loss_fn(q_state_action, target)
@@ -293,7 +303,7 @@ class QAgent:
 
         self.optimizer.step()
 
-        self.loss_log.append(loss.detach().numpy())
+        self.loss_log.append(loss.detach().cpu().numpy())
 
     def make_greedy(self):
         """Makes the agent greedy for evaluation"""
@@ -307,6 +317,9 @@ class QAgent:
     def update_epsilon(self):
         """Updates epsilon"""
         self.epsilon *= self.epsilon_decay_rate
+
+    def reset(self):
+        self.deck =np.zeros((10, 4))
 
     def save(self, path):
         """Saves policy network's state dictionary to path"""

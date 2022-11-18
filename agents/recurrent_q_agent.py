@@ -26,7 +26,9 @@ class RecurrentDeepQAgent:
         hidden_size: int = 256,
         fully_connected_layers: int = 256,
         optimizer=optim.RMSprop,
+        momentum: float = 0,
         device=None,
+        sequence_len: int = 2,
     ) -> None:
         """"""
         self.name = "RecurrentDeepQLearningAgent"
@@ -56,6 +58,7 @@ class RecurrentDeepQAgent:
         ).to(self.device)
 
         self.h, self.c = self.policy_net.init_hidden(1, self.device)
+        self.sequence_len = sequence_len
 
         self.replay_memory = ReplayMemory(replay_memory_capacity)
         self.minimum_training_samples = minimum_training_samples
@@ -66,6 +69,7 @@ class RecurrentDeepQAgent:
         self.optimizer = optimizer(
             self.policy_net.parameters(),
             lr=learning_rate,
+            momentum=momentum,
         )
 
         # Reinforcement learning parameters
@@ -82,6 +86,7 @@ class RecurrentDeepQAgent:
         self.state = None
 
         self.history = []
+        self.loss_log = []
 
     def observe(self, env, player) -> None:
         """Updates the agent's state"""
@@ -137,8 +142,9 @@ class RecurrentDeepQAgent:
                     self.h,
                     self.c,
                 )
-
                 output = output[0][0]
+                #print("-"*140)
+                #print(f"STATE: {state}\nQs: {output}")
                 sorted_actions = (-output).argsort()
             for predicted_action in sorted_actions:
                 if predicted_action in available_actions:
@@ -165,11 +171,19 @@ class RecurrentDeepQAgent:
             )
         )
 
+        if len(self.history) == self.sequence_len:
+            self.replay_memory.push(self.history)
+            self.history = []
+
         if self.done:
             self.current_ep += 1
+            #print("*"*140)
+            #print(self.h)
             self.h, self.c = self.policy_net.init_hidden(1, self.device)
-
-            self.replay_memory.push(tuple(self.history))
+            #print("RESET HIDDEN STATE")
+            #print(self.h)
+            #print("*"*140)
+            #self.replay_memory.push(tuple(self.history))
             self.history = []
 
         if self.epsilon > self.minimum_epsilon:
@@ -188,17 +202,15 @@ class RecurrentDeepQAgent:
             return
 
         # Otherwise sample a batch
-        # batch of batch_size number of episode, each episode is a list of
-        # transitions (s, a, r, s', done)
         self.training_iterations += 1
         batch = self.replay_memory.sample(self.batch_size)
 
-        # print("-" * 140)
-        episodes = [ep for ep in batch]
-        states = [[transition[0] for transition in ep] for ep in episodes]
-        actions = [[transition[1] for transition in ep] for ep in episodes]
-        rewards = [[transition[2] for transition in ep] for ep in episodes]
-        next_states = [[transition[3] for transition in ep] for ep in episodes]
+        sequences = [seq for seq in batch]
+        states = [[transition[0] for transition in seq] for seq in sequences]
+        actions = [[transition[1] for transition in seq] for seq in sequences]
+        rewards = [[transition[2] for transition in seq] for seq in sequences]
+        next_states = [[transition[3] for transition in seq] for seq in sequences]
+        done = [[transition[4] for transition in seq] for seq in sequences]
 
         states = torch.tensor(
             np.array(states),
@@ -220,51 +232,42 @@ class RecurrentDeepQAgent:
             dtype=torch.float32,
         ).to(self.device)
 
-        """
-        print(f"STATES shape {states.shape}")
-        print(f"ACTIONS shape {actions.shape}")
-        print(f"REWARDS shape {rewards.shape}")
-        print(f"NEXT_STATES shape {next_states.shape}")
-        """
-        self.policy_net.train()
-        h, c = self.policy_net.init_hidden(self.batch_size, self.device)
+        done = torch.tensor(
+            np.array(done),
+            dtype=torch.bool,
+        ).to(self.device)
 
-        # computes Q(s, a1), Q(s, a_2), ... , Q(s, a_n)
+        self.policy_net.train()
+        h, c = self.policy_net.init_hidden(
+            self.batch_size, self.device
+        )
+
         q_values, (h, c) = self.policy_net(states, h, c)
-        # gets the right Q(s, a)
-        # print("-" * 140)
-        # print(f"Q_VALUES shape {q_values.shape}")
-        q_state_action = q_values.gather(2, actions.unsqueeze(2))
-        # print(f"Q_S_A shape {q_state_action.shape}")
+        q_state_action = q_values.gather(2, actions.unsqueeze(-1))
 
         with torch.no_grad():
             self.target_net.eval()
-            ht, ct = self.target_net.init_hidden(self.batch_size, self.device)
-            # computes Q'(s', a_1), Q'(s', a_2), ..., Q'(s', a_n)
+            ht, ct = self.target_net.init_hidden(
+                self.batch_size, self.device
+            )
             target_q_values, (ht, ct) = self.target_net(next_states, ht, ct)
-        # gets max_a {Q(s', a)}
-
-        # print(f"TARGET_Q_VALUES shape {q_values.shape}")
 
         next_state_max_q = target_q_values.max(dim=2)[0]
-        # print(f"NEXT_STATE_MAX_Q shape {next_state_max_q.shape}")
 
-        # r + discount * Q_max(s)
-        target = rewards + self.discount * next_state_max_q
-        target = target.unsqueeze(2)
+        target = rewards + (self.discount * next_state_max_q * (1-done.float()))
+        target = target.unsqueeze(-1)
 
-        # print(f"TARGET shape {target.shape}")
-        # print("=" * 140)
         loss = self.loss_fn(q_state_action, target)
         self.optimizer.zero_grad()
 
         loss.backward()
-        for param in self.policy_net.parameters():
-            param.grad.data.clamp_(-10, 10)
+        
+        nn.utils.clip_grad_norm_(self.policy_net.rnn.parameters(), 10)
+        nn.utils.clip_grad_norm_(self.policy_net.fc1.parameters(), 1)
+        nn.utils.clip_grad_norm_(self.policy_net.out.parameters(), 1)
 
         self.optimizer.step()
-
-        # self.loss_log.append(loss.detach().numpy())
+        self.loss_log.append(loss.detach().cpu().numpy())
 
     def make_greedy(self):
         """Makes the agent greedy for evaluation"""
@@ -278,6 +281,9 @@ class RecurrentDeepQAgent:
     def update_epsilon(self):
         """Updates epsilon"""
         self.epsilon *= self.epsilon_decay_rate
+
+    def reset(self):
+        self.h, self.c = self.policy_net.init_hidden(1, self.device)
 
     def save(self, path):
         """Saves policy network's state dictionary to path"""

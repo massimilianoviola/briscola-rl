@@ -384,6 +384,12 @@ def play_episode(game, agents, train=True):
     game.reset()
     rewards_log = {agent.name: [] for agent in agents}
     rewards = []
+
+    if agents[0].name == "RecurrentDeepQLearningAgent":
+        #print("="*140)
+        #print("RESETTING HIDDEN")
+        agents[0].h, agents[0].c = agents[0].policy_net.init_hidden(1, agents[0].device)
+
     while not game.check_end_game():
         # action step
         players_order = game.get_players_order()
@@ -441,4 +447,4 @@ def play_episode(game, agents, train=True):
         if train and rewards:
             agent.update(rewards[i])
 
-    return *game.end_game(), rewards_log
+    return (*game.end_game(), rewards_log)

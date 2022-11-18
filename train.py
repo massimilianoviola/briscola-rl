@@ -4,7 +4,7 @@ import random
 import numpy as np
 import torch
 import environment as brisc
-
+import matplotlib.pyplot as plt
 from agents.random_agent import RandomAgent
 from agents.q_agent import QAgent
 from agents.ai_agent import AIAgent
@@ -27,7 +27,7 @@ def train(
     The winrate iobtained from these evaluations is used to select the best
     model and its weights are saved.
     """
-
+    rets = []
     torch.manual_seed(0)
     np.random.seed(0)
     random.seed(0)
@@ -40,8 +40,7 @@ def train(
     winrates = []
 
     for epoch in range(1, num_epochs + 1):
-        print(f"Episode: {epoch} epsilon: {agents[0].epsilon:.6f}", end="\r")
-
+        
         game_winner_id, winner_points, episode_rewards_log = brisc.play_episode(
             game,
             agents,
@@ -69,12 +68,19 @@ def train(
                 agent.restore_epsilon()
             if total_wins[0] > best_total_wins:
                 best_total_wins = total_wins[0]
-
+            plt.semilogy(agents[0].loss_log)
+            plt.show()
         # Update target network for Deep Q-learning agent
         if epoch % agents[0].replace_every == 0:
             agents[0].target_net.load_state_dict(
                 agents[0].policy_net.state_dict(),
             )
+
+        ret = np.sum(episode_rewards_log["QLearningAgent"])
+        rets.append(ret)
+        #print(episode_rewards_log["QLearningAgent"])
+        print(f"Episode: {epoch} epsilon: {agents[0].epsilon:.4f} return: {ret}", end="\r")
+
 
     if save:
         with open(save_dir + "/data/rewards.pkl", "wb") as f:

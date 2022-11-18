@@ -15,23 +15,15 @@ def objective(trial):
     logger = BriscolaLogger(BriscolaLogger.LoggerLevels.TRAIN)
     game = brisc.BriscolaGame(2, logger)
 
-    recurrent_layer_size = trial.suggest_categorical(
-        "recurrent_layer_size",
-        [32, 64, 128, 256],
-    )
+    recurrent_layer_size = 64
 
-    fully_connected_size = trial.suggest_categorical(
-        "fully_connected_size",
-        [32, 64, 128, 256],
-    )
+    fully_connected_size = 64
 
-    optimizer = trial.suggest_categorical(
-        "optimizer",
-        ["SGD", "RMSprop", "Adam"],
-    )
+    optimizer = "RMSprop"
 
-    lr = trial.suggest_float("lr", 1e-8, 1e-1)
-    replace_every = trial.suggest_int("replace_every", 100, 1000)
+    lr = trial.suggest_float("lr", 1e-4, 1e-1)
+    momentum = trial.suggest_float("momentum", 0.9, 1.0)
+    replace_every = 500
 
     if optimizer == "SGD":
         opt = optim.SGD
@@ -48,8 +40,8 @@ def objective(trial):
         epsilon=1.0,
         minimum_epsilon=0.1,
         replay_memory_capacity=1000000,
-        minimum_training_samples=2000,
-        batch_size=256,
+        minimum_training_samples=500,
+        batch_size=32,
         discount=0.95,
         loss_fn=torch.nn.SmoothL1Loss(),
         learning_rate=lr,
@@ -58,18 +50,16 @@ def objective(trial):
         hidden_size=recurrent_layer_size,
         fully_connected_layers=fully_connected_size,
         optimizer=opt,
+        momentum=momentum,
+        sequence_len=4,
     )
 
     agents.append(agent)
     agents.append(RandomAgent())
 
-    torch.manual_seed(0)
-    np.random.seed(0)
-    random.seed(0)
-
-    num_epochs = 1000
-    evaluate_every = 250
-    num_evaluations = 200
+    num_epochs = 2000
+    evaluate_every = 500
+    num_evaluations = 1000
 
     winrates = []
     for epoch in range(1, num_epochs + 1):

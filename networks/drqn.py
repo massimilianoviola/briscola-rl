@@ -40,12 +40,11 @@ class DRQN(nn.Module):
     def __init__(
         self,
         input_dim: int,
-        hidden_size: int,
-        output_dim: int,
-        num_recurrent_layers: int,
+        hidden_size: int = 256,
+        output_dim: int = 3,
+        num_recurrent_layers: int = 1,
         fc_size: int = 256,
         fc_activation=nn.ReLU(),
-        dropout_rate: float = 0.5,
     ) -> None:
         """"""
         super().__init__()
@@ -55,23 +54,21 @@ class DRQN(nn.Module):
             input_dim, hidden_size, num_recurrent_layers, batch_first=True
         )
 
-        self.dropout = nn.Dropout(dropout_rate)
         self.fc1 = nn.Linear(hidden_size, fc_size)
         self.out = nn.Linear(fc_size, output_dim)
         self.act = fc_activation
 
     def forward(self, x: Tensor, h: Tensor, c: Tensor) -> Tensor:
-        x, h = self.rnn(x, (h, c))
-        # x = self.dropout(x)
+        x, hidden = self.rnn(x, (h, c))
         x = self.act(self.fc1(x))
         x = self.out(x)
-        return x, h
+        return x, hidden
 
     def init_hidden(
         self,
         batch_size: int,
         device: str = "cpu",
     ) -> Tuple[Tensor, Tensor]:
-        h = torch.zeros(1, batch_size, self.hidden_size).to(device)
-        c = torch.zeros(1, batch_size, self.hidden_size).to(device)
+        h = torch.zeros(1, batch_size, self.hidden_size).float().to(device)
+        c = torch.zeros(1, batch_size, self.hidden_size).float().to(device)
         return h, c
