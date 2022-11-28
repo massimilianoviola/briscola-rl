@@ -69,7 +69,7 @@ class QAgent:
 
     def observe(self, env, player):
         """Observes the environment and updates the state"""
-        self.get_state(env, player)
+        self.get_state_just_hand(env, player)
 
     def get_state_just_hand_one_hot_encoding(self, env, player):
         """The state vector encodes 5 cards: the 3 cards in the player's hand,
@@ -114,56 +114,26 @@ class QAgent:
         [0, 1, 1, 0, 0, 0] if the briscola is "bastoni".
         """
         state = np.zeros(self.n_features)
-        value_offset = 1
-        seed_offset = 3
+        value_offset = 2
+        seed_offset = 2
         features_per_card = 6
         state[0] = player.points
+        state[1] = env.counter
 
         for i, card in enumerate(player.hand):
             number_index = i * features_per_card + value_offset
-            seed_index = i * features_per_card + seed_offset + card.seed
+            seed_index = i * features_per_card + seed_offset + card.seed + value_offset
             state[number_index] = card.number
             state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
             state[seed_index] = 1
 
         for i, card in enumerate(env.played_cards):
             number_index = i + 3 * features_per_card + value_offset
-            seed_index = i + 3 * features_per_card + seed_offset + card.seed
+            seed_index = i + 3 * features_per_card + seed_offset + card.seed + value_offset
             state[number_index] = card.number
             state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
             state[seed_index] = 1
 
-        self.last_state = self.state
-        self.state = state
-        self.done = env.check_end_game()
-
-    def get_state_full_knowledge(self, env, player):
-        """"""
-        state = np.zeros(25)
-        value_offset = 1
-        seed_offset = 3
-        features_per_card = 6
-        state[0] = player.points
-        for i, card in enumerate(player.hand):
-            number_index = i * features_per_card + value_offset
-            seed_index = i * features_per_card + seed_offset + card.seed
-            state[number_index] = card.number
-            state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
-            state[seed_index] = 1
-
-        for i, card in enumerate(env.played_cards):
-            number_index = i + 3 * features_per_card + value_offset
-            seed_index = i + 3 * features_per_card + seed_offset + card.seed
-            state[number_index] = card.number
-            state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
-            state[seed_index] = 1
-
-        deck = np.ones((10, 4))
-        for card in env.deck.current_deck:
-            deck[card.number][card.seed] = 0
-
-        deck = deck.flatten()
-        state = np.concatenate((state, deck))
         self.last_state = self.state
         self.state = state
         self.done = env.check_end_game()
@@ -319,7 +289,7 @@ class QAgent:
         self.epsilon *= self.epsilon_decay_rate
 
     def reset(self):
-        self.deck =np.zeros((10, 4))
+        self.deck = np.zeros((10, 4))
 
     def save(self, path):
         """Saves policy network's state dictionary to path"""

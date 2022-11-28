@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from networks.drqn import DRQN, ReplayMemory
+from collections import deque
 
 
 class RecurrentDeepQAgent:
@@ -85,7 +86,7 @@ class RecurrentDeepQAgent:
         self.reward = None
         self.state = None
 
-        self.history = []
+        self.history = deque(maxlen=self.sequence_len)
         self.loss_log = []
 
     def observe(self, env, player) -> None:
@@ -102,21 +103,22 @@ class RecurrentDeepQAgent:
         [0, 1, 1, 0, 0, 0] if the briscola is "bastoni".
         """
         state = np.zeros(self.n_features)
-        value_offset = 1
-        seed_offset = 3
+        value_offset = 2
+        seed_offset = 2
         features_per_card = 6
         state[0] = player.points
+        state[1] = env.counter
 
         for i, card in enumerate(player.hand):
             number_index = i * features_per_card + value_offset
-            seed_index = i * features_per_card + seed_offset + card.seed
+            seed_index = i * features_per_card + seed_offset + card.seed + value_offset
             state[number_index] = card.number
             state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
             state[seed_index] = 1
 
         for i, card in enumerate(env.played_cards):
             number_index = i + 3 * features_per_card + value_offset
-            seed_index = i + 3 * features_per_card + seed_offset + card.seed
+            seed_index = i + 3 * features_per_card + seed_offset + card.seed + value_offset
             state[number_index] = card.number
             state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
             state[seed_index] = 1
@@ -172,8 +174,9 @@ class RecurrentDeepQAgent:
         )
 
         if len(self.history) == self.sequence_len:
-            self.replay_memory.push(self.history)
-            self.history = []
+            self.replay_memory.push(list(self.history))
+            # self.history = deque(maxlen=self.sequence_len)
+            # self.history = []
 
         if self.done:
             self.current_ep += 1
@@ -184,7 +187,7 @@ class RecurrentDeepQAgent:
             #print(self.h)
             #print("*"*140)
             #self.replay_memory.push(tuple(self.history))
-            self.history = []
+            self.history = deque(maxlen=self.sequence_len)  
 
         if self.epsilon > self.minimum_epsilon:
             self.update_epsilon()

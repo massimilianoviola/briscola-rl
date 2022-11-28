@@ -29,12 +29,12 @@ def train():
     # Initialize agents
     agents = []
     agent = RecurrentDeepQAgent(
-        n_features=25,
+        n_features=26,
         n_actions=3,
         epsilon=1.0,
         minimum_epsilon=0.1,
         replay_memory_capacity=1000000,
-        minimum_training_samples=500,
+        minimum_training_samples=2000,
         batch_size=64,
         discount=0.95,
         loss_fn=torch.nn.SmoothL1Loss(),
@@ -50,8 +50,9 @@ def train():
 
     agents.append(agent)
     agents.append(RandomAgent())
+    # agents.append(AIAgent())
 
-    num_epochs = 25000
+    num_epochs = 10000
     evaluate_every = replace_every
     num_evaluations = 1000
     for epoch in range(1, num_epochs + 1):

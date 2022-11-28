@@ -1,3 +1,4 @@
+import os
 import argparse
 import pickle
 import random
@@ -38,9 +39,11 @@ def train(
     rewards_per_episode = []
     points_log = []
     winrates = []
+    if save:
+        if not os.path.exists(os.path.dirname(save_dir)):
+            os.makedirs(os.path.dirname(save_dir))
 
     for epoch in range(1, num_epochs + 1):
-        
         game_winner_id, winner_points, episode_rewards_log = brisc.play_episode(
             game,
             agents,
@@ -61,35 +64,33 @@ def train(
             current_winrate = total_wins[0] / (total_wins[0] + total_wins[1])
             if current_winrate > best_winrate and save:
                 best_winrate = current_winrate
-                agents[0].save(save_dir + "/saved_models/model.pt")
+                agents[0].save(save_dir + "model.pt")
                 print("SAVED")
 
             for agent in agents:
                 agent.restore_epsilon()
             if total_wins[0] > best_total_wins:
                 best_total_wins = total_wins[0]
-            plt.semilogy(agents[0].loss_log)
-            plt.show()
+
         # Update target network for Deep Q-learning agent
         if epoch % agents[0].replace_every == 0:
             agents[0].target_net.load_state_dict(
                 agents[0].policy_net.state_dict(),
             )
 
-        ret = np.sum(episode_rewards_log["QLearningAgent"])
-        rets.append(ret)
+        #ret = np.sum(episode_rewards_log["QLearningAgent"])
+        #rets.append(ret)
         #print(episode_rewards_log["QLearningAgent"])
-        print(f"Episode: {epoch} epsilon: {agents[0].epsilon:.4f} return: {ret}", end="\r")
-
+        print(f"Episode: {epoch} epsilon: {agents[0].epsilon:.4f}", end="\r")
 
     if save:
-        with open(save_dir + "/data/rewards.pkl", "wb") as f:
+        with open(save_dir + "rewards.pkl", "wb") as f:
             pickle.dump(rewards_per_episode, f)
 
-        with open(save_dir + "/data/winrates.pkl", "wb") as f:
+        with open(save_dir + "winrates.pkl", "wb") as f:
             pickle.dump(winrates, f)
 
-        with open(save_dir + "/data/points.pkl", "wb") as f:
+        with open(save_dir + "points.pkl", "wb") as f:
             pickle.dump(points_log, f)
 
     return best_total_wins, rewards_per_episode
@@ -190,7 +191,7 @@ def main(argv=None):
     # Initialize agents
     agents = []
     agent = QAgent(
-        n_features=65,
+        n_features=26,
         n_actions=3,
         epsilon=args.epsilon,
         minimum_epsilon=args.minimum_epsilon,

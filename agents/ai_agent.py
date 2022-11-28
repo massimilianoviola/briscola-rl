@@ -115,3 +115,6 @@ class AIAgent:
 
     def load(self, path):
         pass
+
+    def reset(self):
+        pass

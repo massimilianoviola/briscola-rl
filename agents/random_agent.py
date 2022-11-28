@@ -21,3 +21,6 @@ class RandomAgent:
 
     def restore_epsilon(self):
         pass
+
+    def reset(self):
+        pass

@@ -236,7 +236,7 @@ class BriscolaGame:
         winner_player_id, points = self.evaluate_step()
 
         rewards = []
-        extra_points = 100  # Points for winning
+        extra_points = 0  # Points for winning
         count = 0
         for player_id in self.get_players_order():
             reward = points if player_id is winner_player_id else -points
@@ -385,10 +385,8 @@ def play_episode(game, agents, train=True):
     rewards_log = {agent.name: [] for agent in agents}
     rewards = []
 
-    if agents[0].name == "RecurrentDeepQLearningAgent":
-        #print("="*140)
-        #print("RESETTING HIDDEN")
-        agents[0].h, agents[0].c = agents[0].policy_net.init_hidden(1, agents[0].device)
+    for agent in agents:
+        agent.reset()
 
     while not game.check_end_game():
         # action step
@@ -404,7 +402,7 @@ def play_episode(game, agents, train=True):
 
             # the agent observes the state before acting
             agent.observe(game, player)
-
+        
             if train and rewards:
                 agent.update(rewards[i])
                 rewards_log[agent.name].append(rewards[i])
@@ -413,8 +411,10 @@ def play_episode(game, agents, train=True):
             action = agent.select_action(available_actions)
 
             # if agent.name == "QLearningAgent":
-            # print(f"{agent.name} state {agent.state}")
-
+            #   print(f"state: {agent.state}")
+            #if agent.name == "RecurrentDeepQLearningAgent":
+                #print(f"history: {len(agent.history)}")
+                #print(agent.history)
             # print(f"{agent.name} plays {player.hand[action]} ({action})")
 
             game.play_step(action, player_id)
