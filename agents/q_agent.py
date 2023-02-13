@@ -117,8 +117,8 @@ class QAgent:
         value_offset = 2
         seed_offset = 2
         features_per_card = 6
-        state[0] = player.points
-        state[1] = env.counter
+        state[0] = 0#player.points
+        state[1] = 0#env.counter
 
         for i, card in enumerate(player.hand):
             number_index = i * features_per_card + value_offset

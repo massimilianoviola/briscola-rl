@@ -29,9 +29,7 @@ def train(
     model and its weights are saved.
     """
     rets = []
-    torch.manual_seed(0)
-    np.random.seed(0)
-    random.seed(0)
+
 
     best_total_wins = -1
     best_winrate = 0.0
@@ -97,6 +95,10 @@ def train(
 
 
 def main(argv=None):
+    seed = 0
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     parser = argparse.ArgumentParser()
 
     parser.add_argument(

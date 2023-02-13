@@ -240,8 +240,8 @@ class BriscolaGame:
         count = 0
         for player_id in self.get_players_order():
             reward = points if player_id is winner_player_id else -points
+            # reward = 1 if player_id is winner_player_id else -1
             # reward = points if player_id is winner_player_id else 0
-
             # Reward for winning the match
 
             player = self.players[player_id]
@@ -424,7 +424,7 @@ def play_episode(game, agents, train=True):
             # can only exclude the card he played and the one played by the
             # opponent. In the next turn played_cards will be empty.
             for card in game.played_cards:
-                if agents[0].name == "QLearningAgent":
+                if agents[0].name == "QLearningAgent" or agents[0].name == "PPOAgent":
                     agents[0].deck[card.number][card.seed] = 1
 
         # print("PLAYED:")
