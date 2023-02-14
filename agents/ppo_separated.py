@@ -56,9 +56,10 @@ class PPOAgent:
         n_features: int,
         n_actions: int,
         discount: float,
+        gae_lambda: float,
         critic_loss_fn,
-        actor_learning_rate: float,
-        critic_learning_rate: float,
+        actor_learning_rate: float = 1e-3,
+        critic_learning_rate: float = 1e-3,
         actor_layers: List[int] = [256, 256],
         critic_layers: List[int] = [256, 256],
         ppo_steps: int = 5,
@@ -66,6 +67,7 @@ class PPOAgent:
         ent_coeff: float = 0.0,
         batch_size: int = 32,
         device=None,
+        log=True,
     ) -> None:
         self.name = "PPOAgent"
 
@@ -78,17 +80,15 @@ class PPOAgent:
         self.n_actions = n_actions
 
         self.last_state = None
-        self.action = None
-        self.reward = None
         self.state = None
+        self.action = None
+        self.log_prob = None
+        self.reward = None
 
-        self.states_batch = []
-        self.actions_batch = []
-        self.log_probs_batch = []
-        self.rewards_batch = []
-        self.episode_rewards = []
+        self.reset_batch()
 
         self.discount = discount
+        self.gae_lambda = gae_lambda
         self.deck = np.zeros((10, 4))
 
         self.loss_fn = critic_loss_fn
@@ -112,6 +112,18 @@ class PPOAgent:
         self.ppo_clip = ppo_clip
         self.ent_coeff = ent_coeff
         self.batch_size = batch_size
+
+        self.log = log
+        self.ep = 0
+        self.max_takes = 100
+
+    def reset_batch(self):
+        self.states_batch = []
+        self.actions_batch = []
+        self.log_probs_batch = []
+        self.episode_rewards = []
+        self.rewards_batch = []
+        self.dones = []
 
     def observe(self, env, player):
         """Observes the environment and updates the state"""
@@ -152,46 +164,76 @@ class PPOAgent:
     def select_action(self, available_actions):
         state = torch.from_numpy(self.state).float().to(self.device)
         actions_probabilities = self.actor_net(state)
-        policy = distributions.Categorical(actions_probabilities)
+        dist = distributions.Categorical(actions_probabilities)
         takes = 0
         while True:
             takes += 1
-            if takes >= 100:
+            if takes >= self.max_takes:
                 action = np.random.choice(available_actions)
                 self.action = torch.as_tensor(action)
-                self.log_prob = policy.log_prob(self.action).detach()
+                self.log_prob = dist.log_prob(self.action).detach()
                 break
-            self.action = policy.sample().detach()
-            self.log_prob = policy.log_prob(self.action).detach()
+            self.action = dist.sample().detach()
+            self.log_prob = dist.log_prob(self.action).detach()
             if self.action in available_actions:
                 break
 
         return self.action.item()
 
-    def get_returns(self, rewards_batch):
+    def get_returns(self, rewards_batch, normalize=True):
         returns = []
         for rewards in reversed(rewards_batch):
             G = 0
             for r in reversed(rewards):
                 G = r + self.discount * G
                 returns.append(G)
-
-        return returns[::-1]
+        returns = returns[::-1]
+        returns = torch.tensor(np.array(returns), dtype=torch.float32).to(self.device)
+        if normalize:
+            returns = (returns - returns.mean()) / (returns.std() + 1e-10)
+        return returns
 
     def get_values(self, states):
         values = self.critic_net(states).squeeze()
         return values
 
-    def get_advantages(self, returns, values):
+    def get_advantages(self, returns, values, normalize=True):
         adv = returns - values.detach()
-        adv = (adv - adv.mean()) / (adv.std() + 1e-10)
+        if normalize:
+            adv = (adv - adv.mean()) / (adv.std() + 1e-10)
         return adv
 
-    def get_current_log_probs(self, states, actions):
-        probabilities = self.actor_net(states)
-        policy = distributions.Categorical(probabilities)
-        current_log_probs = policy.log_prob(actions)
-        return current_log_probs, policy.entropy()
+    def gae_advantages(self, rewards_batch, values, dones, normalize=True):
+        v = values.detach()
+        rewards = rewards_batch.flatten()
+        adv = np.zeros_like(rewards)
+        gae_cum = 0
+        for i in reversed(range(len(rewards))):
+            if dones[i]:
+                next_v = 0.0
+                d = 0
+            else:
+                next_v = v[i+1]
+                d = 1
+            delta = rewards[i] + self.discount * next_v * d - v[i]
+            gae_cum = delta + self.discount * self.gae_lambda * gae_cum * d
+            adv[i] = gae_cum
+
+        adv = torch.Tensor(adv).to(self.device)
+        ret = adv + v
+
+        if normalize:
+            adv = (adv - adv.mean()) / (adv.std() + 1e-10)
+            ret = (ret - ret.mean()) / (ret.std() + 1e-10)
+
+        return adv, ret
+
+    def evaluate(self, states, actions):
+        action_probabilities = self.actor_net(states)
+        state_values = self.critic_net(states)
+        dist = distributions.Categorical(action_probabilities)
+        current_log_probs = dist.log_prob(actions)
+        return current_log_probs, state_values.squeeze(), dist.entropy()
 
     def update(self, reward):
         self.reward = reward
@@ -200,18 +242,16 @@ class PPOAgent:
         self.actions_batch.append(self.action)
         self.log_probs_batch.append(self.log_prob)
         self.episode_rewards.append(self.reward)
+        self.dones.append(self.done)
 
         if self.done:
+            self.ep += 1
             self.rewards_batch.append(self.episode_rewards)
 
             self.episode_rewards = []
             if len(self.rewards_batch) >= self.batch_size:
                 self.learn()
-
-                self.states_batch = []
-                self.actions_batch = []
-                self.log_probs_batch = []
-                self.rewards_batch = []
+                self.reset_batch()
 
     def learn(self):
         self.states_batch = torch.Tensor(np.array(self.states_batch))
@@ -219,19 +259,24 @@ class PPOAgent:
         self.log_probs_batch = torch.Tensor(np.array(self.log_probs_batch))
         self.rewards_batch = torch.Tensor(np.array(self.rewards_batch))
 
-        returns = self.get_returns(self.rewards_batch)
-        returns = torch.Tensor(np.array(returns))
+        #returns = self.get_returns(self.rewards_batch)
         values = self.get_values(self.states_batch)
-        advantages = self.get_advantages(returns, values)
+        # adv = self.get_advantages(returns, values)
+        adv, returns = self.gae_advantages(self.rewards_batch, values, self.dones, True)
 
         for _ in range(self.ppo_steps):
-            values = self.get_values(self.states_batch)
-            curr_log_probs, entropy = self.get_current_log_probs(self.states_batch, self.actions_batch)
+            # values = self.get_values(self.states_batch)
+            curr_log_probs, values, entropy = self.evaluate(
+                self.states_batch, self.actions_batch
+            )
+
             ratios = torch.exp(curr_log_probs - self.log_probs_batch)
-            loss_1 = ratios * advantages
-            loss_2 = torch.clamp(ratios, 1 - self.ppo_clip, 1 + self.ppo_clip) * advantages
-            entropy_loss = - entropy.mean()
-            actor_loss = (-torch.min(loss_1, loss_2)).mean() + self.ent_coeff * entropy_loss
+            loss_1 = ratios * adv
+            loss_2 = torch.clamp(ratios, 1 - self.ppo_clip, 1 + self.ppo_clip) * adv
+            policy_loss = -torch.min(loss_1, loss_2).mean()
+            entropy_loss = -entropy.mean()
+
+            actor_loss = policy_loss + self.ent_coeff * entropy_loss
             critic_loss = self.loss_fn(values, returns)
 
             self.actor_opt.zero_grad()
@@ -242,7 +287,11 @@ class PPOAgent:
             critic_loss.backward()
             self.critic_opt.step()
 
-        print(f"actor: {actor_loss.detach():.6f} critic: {critic_loss.detach():.2f} entropy: {-entropy_loss:.2f}")
+        if self.log:
+            print(f"EPISODE #{self.ep}", end=" ")
+            print(f"actor_loss: {actor_loss.detach():.4f}", end=" ")
+            print(f"critic_loss: {critic_loss.detach():.4f}", end=" ")
+            print(f"entropy_loss: {-entropy_loss:.4f}", end="\n")
 
     def make_greedy(self):
         pass

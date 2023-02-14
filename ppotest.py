@@ -7,7 +7,7 @@ import environment as brisc
 
 from agents.random_agent import RandomAgent
 from agents.q_agent import QAgent
-from agents.ppo_shared import PPOAgent
+from agents.ppo_separated import PPOAgent
 from agents.ai_agent import AIAgent
 from evaluate import evaluate
 from utils import BriscolaLogger
@@ -29,21 +29,24 @@ def train():
     agent = PPOAgent(
         n_features=65,
         n_actions=3,
-        discount=0.9,
+        discount=0.99,
+        gae_lambda=0.95,
         critic_loss_fn=torch.nn.SmoothL1Loss(),
-        learning_rate=5e-4,
+        actor_learning_rate=5e-4,
+        critic_learning_rate=1e-3,
         actor_layers=[256, 256],
         critic_layers=[256, 256],
         ppo_steps=10,
-        ppo_clip=0.1,
-        ent_coeff=0.0,
-        value_coeff=0.5,
-        batch_size=100,
+        ppo_clip=0.2,
+        ent_coeff=0.01,
+        # value_coeff=0.5,
+        batch_size=64,
+        log=True,
     )
 
     agents.append(agent)
     agents.append(RandomAgent())
-    #agents.append(AIAgent())
+    # agents.append(AIAgent())
 
     num_epochs = 1000000
     evaluate_every = 1000

@@ -41,15 +41,16 @@ class PPOAgent:
         n_features: int,
         n_actions: int,
         discount: float,
+        gae_lambda: float,
         critic_loss_fn,
         learning_rate: float = 1e-3,
         actor_layers: List[int] = [256, 256],
         critic_layers: List[int] = [256, 256],
         ppo_steps: int = 5,
         ppo_clip: float = 0.2,
-        ent_coeff: float = 0.0,
+        ent_coeff: float = 0.01,
         value_coeff: float = 0.5,
-        batch_size: int = 32,
+        batch_size: int = 64,
         device=None,
         log=True,
     ) -> None:
@@ -91,6 +92,7 @@ class PPOAgent:
         self.log_probs_batch = []
         self.episode_rewards = []
         self.rewards_batch = []
+        self.dones = []
 
     def observe(self, env, player):
         """Observes the environment and updates the state"""
@@ -155,6 +157,7 @@ class PPOAgent:
         self.actions_batch.append(self.action)
         self.log_probs_batch.append(self.log_prob)
         self.episode_rewards.append(self.reward)
+        self.dones.append(self.done)
 
         if self.done:
             self.ep += 1
@@ -183,6 +186,31 @@ class PPOAgent:
         if normalize:
             adv = (adv - adv.mean()) / (adv.std() + 1e-10)
         return adv
+
+    def gae_advantages(self, rewards_batch, values, dones, normalize=True):
+        v = values.detach()
+        rewards = rewards_batch.flatten()
+        adv = np.zeros_like(rewards)
+        gae_cum = 0
+        for i in reversed(range(len(rewards))):
+            if dones[i]:
+                next_v = 0.0
+                d = 0
+            else:
+                next_v = v[i+1]
+                d = 1
+            delta = rewards[i] + self.discount * next_v * d - v[i]
+            gae_cum = delta + self.discount * self.gae_lambda * gae_cum * d
+            adv[i] = gae_cum
+
+        adv = torch.Tensor(adv).to(self.device)
+        ret = adv + v
+
+        if normalize:
+            adv = (adv - adv.mean()) / (adv.std() + 1e-10)
+            ret = (ret - ret.mean()) / (ret.std() + 1e-10)
+
+        return adv, ret
 
     def evaluate(self, states_batch, actions_batch):
         actions_probabilities, state_values = self.policy(states_batch)
