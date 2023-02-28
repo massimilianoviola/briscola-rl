@@ -1,10 +1,14 @@
 import random
+import time
 
 
 class HumanAgent:
     """Agent controlled via keyboard input."""
 
     def __init__(self):
+        self.played_cards = None
+        self.hand = None
+        self.briscola = None
         self.name = 'HumanAgent'
 
     def observe(self, game, player):
@@ -15,6 +19,11 @@ class HumanAgent:
     def select_action(self, actions, render=False):
         """Parse user input from the keyboard.
         If it's not a valid action index, do something random.
+
+        @param actions: list of available actions
+        @param render: True is you want logs, False otherwise
+
+        @return the index of the chosen action
         """
         if not render:
             print("Your turn!")

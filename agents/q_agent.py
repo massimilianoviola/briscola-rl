@@ -10,21 +10,21 @@ class QAgent:
     """Q-learning agent"""
 
     def __init__(
-        self,
-        n_features: int,
-        n_actions: int,
-        replay_memory_capacity: int,
-        minimum_training_samples: int,
-        batch_size: int,
-        discount: float,
-        loss_fn,
-        learning_rate: float,
-        replace_every: int,
-        epsilon: float,
-        minimum_epsilon: float,
-        epsilon_decay_rate: float,
-        layers: List[int] = [256, 256],
-        device=None,
+            self,
+            n_features: int,
+            n_actions: int,
+            replay_memory_capacity: int,
+            minimum_training_samples: int,
+            batch_size: int,
+            discount: float,
+            loss_fn,
+            learning_rate: float,
+            replace_every: int,
+            epsilon: float,
+            minimum_epsilon: float,
+            epsilon_decay_rate: float,
+            layers: List[int] = [256, 256],
+            device=None,
     ) -> None:
         """"""
         self.name = "QLearningAgent"
@@ -117,8 +117,8 @@ class QAgent:
         value_offset = 2
         seed_offset = 2
         features_per_card = 6
-        state[0] = 0#player.points
-        state[1] = 0#env.counter
+        state[0] = 0  # player.points
+        state[1] = 0  # env.counter
 
         for i, card in enumerate(player.hand):
             number_index = i * features_per_card + value_offset
@@ -261,7 +261,7 @@ class QAgent:
         next_state_max_q = target_q_values.max(dim=1)[0]
 
         # r + discount * Q_max(s)
-        target = rewards + (self.discount * next_state_max_q * (1-done.float()))
+        target = rewards + (self.discount * next_state_max_q * (1 - done.float()))
         target = target.unsqueeze(1)
 
         loss = self.loss_fn(q_state_action, target)

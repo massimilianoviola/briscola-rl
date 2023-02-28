@@ -21,6 +21,10 @@ class BriscolaDeck:
     """Initialize a deck of Briscola cards with its attributes."""
 
     def __init__(self):
+        self.current_deck = None
+        self.end_deck = None
+        self.briscola = None
+        self.deck = None
         self.create_decklist()
         self.reset()
 
@@ -28,7 +32,7 @@ class BriscolaDeck:
         """Create all the BriscolaCards and add them to the deck."""
         points = [11, 0, 10, 0, 0, 0, 0, 2, 3, 4]
         strengths = [9, 0, 8, 1, 2, 3, 4, 5, 6, 7]
-        seeds = ["Bastoni", "Coppe", "Denari", "Spade"]
+        seeds = ["Denari", "Coppe", "Spade", "Bastoni"]
         names = [
             "Asso",
             "Due",
@@ -109,6 +113,8 @@ class BriscolaPlayer:
     """Create basic player actions."""
 
     def __init__(self, _id):
+        self.points = None
+        self.hand = None
         self.id = _id
         self.reset()
 
@@ -127,13 +133,19 @@ class BriscolaPlayer:
                 "Calling BriscolaPlayer.draw caused the player to have more than 3 cards in hand!"
             )
 
+    def get_hand(self):
+        """
+        Return the player hand, that is an array containing 3 card objects
+        """
+        return self.hand
+
     def play_card(self, hand_index):
         """Try to play a card from the hand and return the chosen card or an exception if invalid index."""
         try:
             card = self.hand[hand_index]
             del self.hand[hand_index]
             return card
-        except:
+        except Exception as e:
             raise ValueError("BriscolaPlayer.play_card called with invalid hand_index!")
 
 
@@ -141,6 +153,12 @@ class BriscolaGame:
     """Create the game environment with all the game stages."""
 
     def __init__(self, num_players=2, logger=BriscolaLogger()):
+        self.briscola = None
+        self.players_order = None
+        self.turn_player = None
+        self.players = None
+        self.played_cards = None
+        self.history = None
         self.num_players = num_players
         self.deck = BriscolaDeck()
         self.logger = logger
@@ -182,10 +200,10 @@ class BriscolaGame:
         for passnum in range(len(player.hand) - 1, 0, -1):
             for i in range(passnum):
                 if scoring(
-                    self.briscola.seed,
-                    player.hand[i],
-                    player.hand[i + 1],
-                    keep_order=False,
+                        self.briscola.seed,
+                        player.hand[i],
+                        player.hand[i + 1],
+                        keep_order=False,
                 ):
                     temp = player.hand[i]
                     player.hand[i] = player.hand[i + 1]
@@ -245,7 +263,7 @@ class BriscolaGame:
             # Reward for winning the match
 
             player = self.players[player_id]
-            if self.won_the_match_points == False:
+            if not self.won_the_match_points:
                 if player.points >= 60 and reward > 0:
                     # print(f"PLAYER POINTS {player.points}")
                     reward += extra_points
@@ -381,12 +399,15 @@ def play_episode(game, agents, train=True):
     rewards_log will contain as key the agent's name and as value a list
     containing all the rewards that the agent has received at each step.
     """
-    game.reset()
+
+    players_order = None
+    # game.reset()
     rewards_log = {agent.name: [] for agent in agents}
     rewards = []
 
     for agent in agents:
-        agent.reset()
+        if agent.name != "HumanAgent":
+            agent.reset()
 
     while not game.check_end_game():
         # action step
@@ -402,19 +423,22 @@ def play_episode(game, agents, train=True):
 
             # the agent observes the state before acting
             agent.observe(game, player)
-        
+
             if train and rewards:
                 agent.update(rewards[i])
                 rewards_log[agent.name].append(rewards[i])
 
             available_actions = game.get_player_actions(player_id)
-            action = agent.select_action(available_actions)
+            if agent.name == "HumanAgent":
+                action = agent.select_action(available_actions)
+            else:
+                action = agent.select_action(available_actions)
 
             # if agent.name == "QLearningAgent":
             #   print(f"state: {agent.state}")
-            #if agent.name == "RecurrentDeepQLearningAgent":
-                #print(f"history: {len(agent.history)}")
-                #print(agent.history)
+            # if agent.name == "RecurrentDeepQLearningAgent":
+            # print(f"history: {len(agent.history)}")
+            # print(agent.history)
             # print(f"{agent.name} plays {player.hand[action]} ({action})")
 
             game.play_step(action, player_id)
@@ -447,4 +471,4 @@ def play_episode(game, agents, train=True):
         if train and rewards:
             agent.update(rewards[i])
 
-    return (*game.end_game(), rewards_log)
+    return *game.end_game(), rewards_log
