@@ -1,6 +1,5 @@
 Pillow
 numpy
-tk
 matplotlib
 optuna
 torch

@@ -1,4 +1,5 @@
 import random
+import time
 
 
 class HumanAgent:
@@ -19,6 +20,7 @@ class HumanAgent:
     def played_card(self, action):
         """
         Method called by the gui for specifying the played card
+
         @param action: index [0, 2] that is the played card
         """
         self.action = action
@@ -28,7 +30,7 @@ class HumanAgent:
         If it's not a valid action index, do something random.
 
         @param actions: list of available actions
-        @param: condition: threading.Condition() necessary for handling the wait-notify behavior
+        @param condition: threading.Condition() necessary for handling the wait-notify behavior
         @param render: True is you want logs, False otherwise
 
         @return the index of the chosen action

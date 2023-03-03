@@ -1,4 +1,5 @@
 import random
+import time
 
 from gui.briscola_gui import BriscolaGui
 from utils import BriscolaLogger
@@ -131,6 +132,8 @@ class BriscolaPlayer:
         filename = BriscolaGui.find_card_name(new_card, card_images)
         if self.id == 0:
             gui_obj.player_draw_card(filename)
+        elif self.id == 1:
+            gui_obj.agent_draw_card(filename)
         if new_card is not None:
             self.hand.append(new_card)
         if len(self.hand) > 3:
@@ -440,6 +443,7 @@ def play_episode(game, agents, cond, gui_obj=None, train=True):
                 action = agent.select_action(available_actions, cond)
             else:
                 action = agent.select_action(available_actions)
+                gui_obj.agent_play_card(action)
 
             # if agent.name == "QLearningAgent":
             #   print(f"state: {agent.state}")
@@ -469,6 +473,7 @@ def play_episode(game, agents, cond, gui_obj=None, train=True):
         # print(f"{agents[player_id].name} gets reward {rewards[i]}")
 
         game.draw_step(card_images, gui_obj)
+        gui_obj.empty_table_frame()
 
     # update for the terminal state
     for i, player_id in enumerate(players_order):
