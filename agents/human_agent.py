@@ -1,11 +1,11 @@
 import random
-import time
 
 
 class HumanAgent:
     """Agent controlled via keyboard input."""
 
     def __init__(self):
+        self.action = None
         self.played_cards = None
         self.hand = None
         self.briscola = None
@@ -16,11 +16,20 @@ class HumanAgent:
         self.briscola = game.briscola
         self.played_cards = game.played_cards
 
-    def select_action(self, actions, render=False):
+    def played_card(self, action):
+        """
+        Method called by the gui for specifying the played card
+        @param action: index [0, 2] that is the played card
+        """
+        print("action: ", action)
+        self.action = action
+
+    def select_action(self, actions, condition, render=False):
         """Parse user input from the keyboard.
         If it's not a valid action index, do something random.
 
         @param actions: list of available actions
+        @param: condition: threading.Condition() necessary for handling the wait-notify behavior
         @param render: True is you want logs, False otherwise
 
         @return the index of the chosen action
@@ -31,7 +40,9 @@ class HumanAgent:
             print(f"Your hand is: {[card.name for card in self.hand]}.")
 
             try:
-                action = int(input('Input: '))
+                with condition:
+                    condition.wait()
+                action = self.action
             except ValueError:
                 print("Error, not a number!!")
                 action = random.choice(actions)

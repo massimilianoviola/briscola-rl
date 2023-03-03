@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import threading
 from tkinter import *
 from tkinter import ttk
@@ -13,9 +14,10 @@ from agents.human_agent import HumanAgent
 from agents.q_agent import QAgent
 from utils import NetworkTypes, BriscolaLogger
 
+played_card = None
+
 
 class BriscolaGui:
-    card_images = {}
     briscola_name = None
     content = None
     root = None
@@ -25,8 +27,11 @@ class BriscolaGui:
     deck_frame = None
     frame_padding = 5
     card_label_padding = 5
+    cond = threading.Condition()
+    card_images = {}
 
     def __init__(self):
+        self.human_agent = None
         self.menu_frame = None
         self.root = Tk()
         self.root.minsize(900, 700)
@@ -52,6 +57,37 @@ class BriscolaGui:
             img = Image.open(img_path).resize(image_size, resample=Resampling.LANCZOS)
             self.card_images[filename] = (ImageTk.PhotoImage(image=img))
 
+    @classmethod
+    def load_images(cls):
+        """
+        @return: list of all card images
+        """
+        card_images = {}
+        # loading and resizing all images
+        image_size = (98, 162)
+        for filename in os.listdir("card_images"):
+            img_path = os.path.join("card_images", filename)
+            img = Image.open(img_path).resize(image_size, resample=Resampling.LANCZOS)
+            card_images[filename] = (ImageTk.PhotoImage(image=img))
+        return card_images
+
+    @classmethod
+    def find_card_name(cls, card, card_images):
+        """
+        Finds the filename of the card image
+
+        @param card: card object of the Briscola game
+        @param card_images: list of all cards images objects
+
+        @return: filename or None if the card doesn't exist
+        """
+        card_name_split = card.name.split()
+        for filename in card_images:
+            # e.g. briscola = ["Asso", "Di", "Bastoni"]
+            if card_name_split[0] in filename and card_name_split[2].lower() in filename:
+                return filename
+        return None
+
     def set_briscola(self, briscola_name):
         """
         Set the filename of the Briscola image
@@ -73,6 +109,11 @@ class BriscolaGui:
         new_card_btn.grid(column=0, row=0)
         # destroying the card object from the player frame
         card_btn.destroy()
+
+        with self.cond:
+            self.human_agent.played_card(index)
+            self.cond.notify()
+
         return card_name
 
     def agent_play_card(self, card_name):
@@ -136,10 +177,11 @@ class BriscolaGui:
         # initialize the environment
         logger = BriscolaLogger(BriscolaLogger.LoggerLevels.PVP)
         game = brisc.BriscolaGame(2, logger)
-        game.reset()
+        game.reset(self.card_images)
 
         # initialize the agents
-        agents = [HumanAgent()]
+        self.human_agent = HumanAgent()
+        agents = [self.human_agent]
 
         if FLAGS.model_dir:
             agent = QAgent(network=FLAGS.network)
@@ -152,24 +194,26 @@ class BriscolaGui:
 
         # initialize the gui
         briscola = game.briscola.name.split()
-        player_hand = game.players[0].get_hand()
         player_cards = []
         for card in game.players[0].get_hand():  # player 0 is the human player
             player_cards.append(card)
-        initial_player_cards = []
+        # finding the image file of the briscola
         for filename in self.card_images:
             # e.g. briscola = ["Asso", "Di", "Bastoni"]
             if briscola[0] in filename and briscola[2].lower() in filename:
                 self.populate_deck_frame(filename)
-            for card in player_cards:
+                break
+        # finding the image files of the player cards
+        initial_player_cards = []
+        for card in player_cards:
+            for filename in self.card_images:
                 card_name = card.name.split()
                 if card_name[0] in filename and card_name[2].lower() in filename:
                     initial_player_cards.append(filename)
-                    player_cards.remove(card)
                     break
         briscola_gui.populate_player_frame(initial_player_cards)
 
-        thread = threading.Thread(target=brisc.play_episode, args=(game, agents, False,))
+        thread = threading.Thread(target=brisc.play_episode, args=(game, agents, self.cond, False,))
         thread.start()
 
     def populate_menu_frame(self):
