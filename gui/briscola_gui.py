@@ -2,6 +2,8 @@ import argparse
 import os
 import sys
 import threading
+import time
+from functools import partial
 from tkinter import *
 from tkinter import ttk
 
@@ -29,8 +31,10 @@ class BriscolaGui:
     card_label_padding = 5
     cond = threading.Condition()
     card_images = {}
+    player_hand = []
 
     def __init__(self):
+        self.new_game_btn = None
         self.human_agent = None
         self.menu_frame = None
         self.root = Tk()
@@ -96,25 +100,36 @@ class BriscolaGui:
         """
         self.briscola_name = briscola_name
 
-    def player_play_card(self, card_btn, card_name, index):
+    def player_play_card(self, index):
         """
         This function moves the chosen card from the "player_frame" to the "table_frame".
-        @param card_btn: button of the card to be removed form the player hand
-        @param card_name: image filename of the played card
         @param index: index of the played card (can be [0, 2])
         :return image filename of the played card
         """
+        print("played card index: ", index)
         # creating and showing a label that represents the player played card into the table frame
-        new_card_btn = ttk.Label(self.table_frame.winfo_children()[1], style="Green.TButton", image=card_btn['image'])
+        try:
+            self.table_frame.winfo_children()[1].winfo_children()[0].destroy()
+        except IndexError:
+            pass
+        new_card_btn = ttk.Label(self.table_frame.winfo_children()[1], style="Green.TButton",
+                                 image=self.card_images[self.player_hand[index]])
         new_card_btn.grid(column=0, row=0)
-        # destroying the card object from the player frame
-        card_btn.destroy()
 
+        # destroying the card objects from the player frame and repopulating it
+        self.player_hand.pop(index)
+        new_player_hand = []
+        for card in self.player_hand:
+            new_player_hand.append(card)
+        self.player_hand.clear()
+        for child in self.player_frame.winfo_children():
+            child.destroy()
+        self.populate_player_frame(new_player_hand)
+
+        # notify the game that a card has being played
         with self.cond:
             self.human_agent.played_card(index)
             self.cond.notify()
-
-        return card_name
 
     def agent_play_card(self, card_name):
         """
@@ -153,18 +168,23 @@ class BriscolaGui:
 
     def player_draw_card(self, card_name):
         """
-        This function adds a card to the player hand.
+        This function adds a card to the player hand at the right most place
         @param card_name: image filename of the card to be added
         """
-        player_frame_children = self.player_frame.winfo_children()
-        card = ttk.Button(self.player_frame, style="Green.TButton", image=self.card_images[card_name],
-                          command=lambda: self.player_play_card(card, card_name, 2))
-        # adding the card at the right most place in the player hand
-        card.grid(column=len(player_frame_children), row=0, padx=self.card_label_padding,
-                  pady=self.card_label_padding)
+        # creating the new card object and passing to its command function the "right" most index
+        index = len(self.player_hand)
+        partial_func = partial(self.player_play_card, index)
+        draw_card = ttk.Button(self.player_frame, style="Green.TButton", image=self.card_images[card_name],
+                               command=partial_func)
 
-    def start_game(self):
+        # adding the card at the right most place in the player hand
+        draw_card.grid(column=len(self.player_hand), row=0, padx=self.card_label_padding,
+                       pady=self.card_label_padding)
+        self.player_hand.append(card_name)
+
+    def start_game(self, gui_obj):
         """Play against one of the intelligent agents."""
+        self.new_game_btn.destroy()
         parser = argparse.ArgumentParser()
 
         parser.add_argument("--model_dir", default=None,
@@ -172,72 +192,59 @@ class BriscolaGui:
         parser.add_argument("--network", default=NetworkTypes.DRQN, choices=[NetworkTypes.DQN, NetworkTypes.DRQN],
                             help="Neural network used for approximating value function")
 
-        FLAGS = parser.parse_args()
+        flags = parser.parse_args()
 
         # initialize the environment
         logger = BriscolaLogger(BriscolaLogger.LoggerLevels.PVP)
-        game = brisc.BriscolaGame(2, logger)
-        game.reset(self.card_images)
+        game = brisc.BriscolaGame(gui_obj, 2, logger)
+        game.reset(self.card_images, gui_obj)
 
         # initialize the agents
         self.human_agent = HumanAgent()
         agents = [self.human_agent]
 
-        if FLAGS.model_dir:
-            agent = QAgent(network=FLAGS.network)
-            agent.load_model(FLAGS.model_dir)
+        if flags.model_dir:
+            agent = QAgent(network=flags.network)
+            agent.load_model(flags.model_dir)
             agent.make_greedy()
             agents.append(agent)
         else:
             agent = AIAgent()
             agents.append(agent)
 
-        # initialize the gui
+        # initializing the gui and starting the game
         briscola = game.briscola.name.split()
-        player_cards = []
-        for card in game.players[0].get_hand():  # player 0 is the human player
-            player_cards.append(card)
         # finding the image file of the briscola
         for filename in self.card_images:
             # e.g. briscola = ["Asso", "Di", "Bastoni"]
             if briscola[0] in filename and briscola[2].lower() in filename:
                 self.populate_deck_frame(filename)
                 break
-        # finding the image files of the player cards
-        initial_player_cards = []
-        for card in player_cards:
-            for filename in self.card_images:
-                card_name = card.name.split()
-                if card_name[0] in filename and card_name[2].lower() in filename:
-                    initial_player_cards.append(filename)
-                    break
-        briscola_gui.populate_player_frame(initial_player_cards)
-
-        thread = threading.Thread(target=brisc.play_episode, args=(game, agents, self.cond, False,))
+        self.populate_agent_frame()
+        thread = threading.Thread(target=brisc.play_episode, args=(game, agents, self.cond, gui_obj, False,))
         thread.start()
 
-    def populate_menu_frame(self):
+    def populate_menu_frame(self, gui_obj):
         """
         Inserts the "new_game" button into "menu_frame"
+
+        @param gui_obj:
         """
-        new_game_btn = ttk.Button(self.menu_frame, text="New game", command=self.start_game)
-        new_game_btn.grid(column=0, row=0, sticky="NSEW")
+        partial_func = partial(self.start_game, gui_obj)
+        self.new_game_btn = ttk.Button(self.menu_frame, text="New game", command=partial_func)
+        self.new_game_btn.grid(column=0, row=0, sticky="NSEW")
 
     def populate_player_frame(self, cards_name):
         """
-        Inserts 3 cards into the frame "player_frame".
-        @param cards_name: array containing 3 image filenames
+        Inserts cards into the frame "player_frame".
+        @param cards_name: array containing image filenames
         """
-        card_1 = ttk.Button(self.player_frame, style="Green.TButton", image=self.card_images[cards_name[0]],
-                            command=lambda: self.player_play_card(card_1, cards_name[0], 0))
-        card_2 = ttk.Button(self.player_frame, style="Green.TButton", image=self.card_images[cards_name[1]],
-                            command=lambda: self.player_play_card(card_2, cards_name[1], 1))
-        card_3 = ttk.Button(self.player_frame, style="Green.TButton", image=self.card_images[cards_name[2]],
-                            command=lambda: self.player_play_card(card_3, cards_name[2], 2))
-
-        card_1.grid(column=0, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
-        card_2.grid(column=1, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
-        card_3.grid(column=2, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
+        for i in range(0, len(cards_name)):
+            partial_func = partial(self.player_play_card, i)
+            card = ttk.Button(self.player_frame, style="Green.TButton", image=self.card_images[cards_name[i]],
+                              command=partial_func)
+            self.player_hand.append(cards_name[i])
+            card.grid(column=i, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
 
     def populate_deck_frame(self, briscola_name):
         """
@@ -249,6 +256,22 @@ class BriscolaGui:
 
         briscola_label.grid(column=0, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding)
         deck_label.grid(column=1, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding)
+
+    def populate_agent_frame(self):
+        """
+        Inserts 3 hidden cards into "deck_frame".
+        """
+        # here we are inside the frame "agent_frame"
+        card_1 = ttk.Label(self.agent_frame, style="Green.TButton",
+                           image=self.card_images["Carte_Napoletane_retro.jpg"])
+        card_2 = ttk.Label(self.agent_frame, style="Green.TButton",
+                           image=self.card_images["Carte_Napoletane_retro.jpg"])
+        card_3 = ttk.Label(self.agent_frame, style="Green.TButton",
+                           image=self.card_images["Carte_Napoletane_retro.jpg"])
+
+        card_1.grid(column=0, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
+        card_2.grid(column=1, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
+        card_3.grid(column=2, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
 
     def create_main_frames(self):
         """
@@ -272,17 +295,6 @@ class BriscolaGui:
         player_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame")
         agent_played_card_frame.grid(column=0, row=0, sticky="NS", padx=self.frame_padding, pady=self.frame_padding)
         player_played_card_frame.grid(column=1, row=0, sticky="NS", padx=self.frame_padding, pady=self.frame_padding)
-        # here we are inside the frame "agent_frame"
-        card_1 = ttk.Label(self.agent_frame, style="Green.TButton",
-                           image=self.card_images["Carte_Napoletane_retro.jpg"])
-        card_2 = ttk.Label(self.agent_frame, style="Green.TButton",
-                           image=self.card_images["Carte_Napoletane_retro.jpg"])
-        card_3 = ttk.Label(self.agent_frame, style="Green.TButton",
-                           image=self.card_images["Carte_Napoletane_retro.jpg"])
-
-        card_1.grid(column=0, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
-        card_2.grid(column=1, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
-        card_3.grid(column=2, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
 
         # resizing frames with resolution changes
         self.deck_frame.columnconfigure(0, weight=1)
@@ -297,17 +309,19 @@ class BriscolaGui:
         self.agent_frame.columnconfigure(2, weight=1)
         self.agent_frame.rowconfigure(0, weight=0)
 
-    def start_gui(self):
+    def start_gui(self, gui_obj):
         """
         This method populates the content with initial values and starts the gui for the Briscola game.
+
+        @param gui_obj:
         """
         self.create_main_frames()
 
-        self.populate_menu_frame()
+        self.populate_menu_frame(gui_obj)
 
         self.root.mainloop()
 
 
 if __name__ == '__main__':
     briscola_gui = BriscolaGui()
-    briscola_gui.start_gui()
+    briscola_gui.start_gui(briscola_gui)

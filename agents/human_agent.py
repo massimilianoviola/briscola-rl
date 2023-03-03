@@ -21,7 +21,6 @@ class HumanAgent:
         Method called by the gui for specifying the played card
         @param action: index [0, 2] that is the played card
         """
-        print("action: ", action)
         self.action = action
 
     def select_action(self, actions, condition, render=False):

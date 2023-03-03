@@ -125,10 +125,12 @@ class BriscolaPlayer:
         self.hand = []
         self.points = 0
 
-    def draw(self, deck, card_images):
+    def draw(self, deck, card_images, gui_obj):
         """Try to draw a card from the deck."""
         new_card = deck.draw_card()
         filename = BriscolaGui.find_card_name(new_card, card_images)
+        if self.id == 0:
+            gui_obj.player_draw_card(filename)
         if new_card is not None:
             self.hand.append(new_card)
         if len(self.hand) > 3:
@@ -155,7 +157,7 @@ class BriscolaPlayer:
 class BriscolaGame:
     """Create the game environment with all the game stages."""
 
-    def __init__(self, num_players=2, logger=BriscolaLogger()):
+    def __init__(self, gui_obj, num_players=2, logger=BriscolaLogger()):
         self.briscola = None
         self.players_order = None
         self.turn_player = None
@@ -168,8 +170,9 @@ class BriscolaGame:
         self.won_the_match_points = False
         self.counter = 1
         self.screen = None
+        self.gui_obj = gui_obj
 
-    def reset(self, card_images):
+    def reset(self, card_images, gui_obj):
         """Start a new game."""
         # initialize the deck
         self.deck.reset()
@@ -188,7 +191,7 @@ class BriscolaGame:
         # initialize players' hands
         for _ in range(0, 3):
             for i in self.players_order:
-                self.players[i].draw(self.deck, card_images)
+                self.players[i].draw(self.deck, card_images, gui_obj)
 
         self.won_the_match_points = False
         self.counter = 1
@@ -225,7 +228,7 @@ class BriscolaGame:
         ]
         return players_order
 
-    def draw_step(self, card_images):
+    def draw_step(self, card_images, gui_obj):
         """Each player, in order, tries to draw a card from the deck."""
         self.logger.PVP(f"\n----------- NEW TURN -----------[{self.counter}]")
         # clear the table for the play_step
@@ -233,7 +236,7 @@ class BriscolaGame:
         # draw the cards in order
         for player_id in self.players_order:
             player = self.players[player_id]
-            player.draw(self.deck, card_images)
+            player.draw(self.deck, card_images, gui_obj)
 
     def play_step(self, action, player_id):
         """A player executes a chosen action."""
@@ -397,7 +400,7 @@ def scoring(briscola_seed, card_0, card_1, keep_order=True):
     return winner
 
 
-def play_episode(game, agents, cond, train=True):
+def play_episode(game, agents, cond, gui_obj=None, train=True):
     """Play an entire game updating the environment at each step.
     rewards_log will contain as key the agent's name and as value a list
     containing all the rewards that the agent has received at each step.
@@ -465,7 +468,7 @@ def play_episode(game, agents, cond, train=True):
         # for i, player_id in enumerate(game.get_players_order()):
         # print(f"{agents[player_id].name} gets reward {rewards[i]}")
 
-        game.draw_step(card_images)
+        game.draw_step(card_images, gui_obj)
 
     # update for the terminal state
     for i, player_id in enumerate(players_order):
