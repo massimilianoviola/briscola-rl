@@ -25,12 +25,12 @@ class HumanAgent:
         """
         self.action = action
 
-    def select_action(self, actions, condition, render=False):
+    def select_action(self, actions, gui_obj, render=False):
         """Parse user input from the keyboard.
         If it's not a valid action index, do something random.
 
         @param actions: list of available actions
-        @param condition: threading.Condition() necessary for handling the wait-notify behavior
+        @param gui_obj: threading.Condition() necessary for handling the wait-notify behavior
         @param render: True is you want logs, False otherwise
 
         @return the index of the chosen action
@@ -41,8 +41,8 @@ class HumanAgent:
             print(f"Your hand is: {[card.name for card in self.hand]}.")
 
             try:
-                with condition:
-                    condition.wait()
+                with gui_obj.cond:
+                    gui_obj.cond.wait()
                 action = self.action
             except ValueError:
                 print("Error, not a number!!")

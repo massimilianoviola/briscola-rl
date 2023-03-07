@@ -175,7 +175,7 @@ class BriscolaGame:
         self.screen = None
         self.gui_obj = gui_obj
 
-    def reset(self, card_images, gui_obj):
+    def reset(self, card_images):
         """Start a new game."""
         # initialize the deck
         self.deck.reset()
@@ -194,7 +194,7 @@ class BriscolaGame:
         # initialize players' hands
         for _ in range(0, 3):
             for i in self.players_order:
-                self.players[i].draw(self.deck, card_images, gui_obj)
+                self.players[i].draw(self.deck, card_images, self.gui_obj)
 
         self.won_the_match_points = False
         self.counter = 1
@@ -231,7 +231,7 @@ class BriscolaGame:
         ]
         return players_order
 
-    def draw_step(self, card_images, gui_obj):
+    def draw_step(self, card_images):
         """Each player, in order, tries to draw a card from the deck."""
         self.logger.PVP(f"\n----------- NEW TURN -----------[{self.counter}]")
         # clear the table for the play_step
@@ -239,7 +239,7 @@ class BriscolaGame:
         # draw the cards in order
         for player_id in self.players_order:
             player = self.players[player_id]
-            player.draw(self.deck, card_images, gui_obj)
+            player.draw(self.deck, card_images, self.gui_obj)
 
     def play_step(self, action, player_id):
         """A player executes a chosen action."""
@@ -299,6 +299,7 @@ class BriscolaGame:
         winner_player = self.players[winner_player_id]
 
         self.update_game(winner_player, points)
+        self.gui_obj.insert_log(f"Player {winner_player_id} wins {points} points with {strongest_card.name}.")
         self.logger.PVP(
             f"Player {winner_player_id} wins {points} points with {strongest_card.name}."
         )
@@ -336,6 +337,7 @@ class BriscolaGame:
             )
 
         winner_player_id, winner_points = self.get_winner()
+        self.gui_obj.insert_log(f"Player {winner_player_id} wins with {winner_points} points!!")
         self.logger.PVP(f"Player {winner_player_id} wins with {winner_points} points!!")
 
         return winner_player_id, winner_points
@@ -403,7 +405,7 @@ def scoring(briscola_seed, card_0, card_1, keep_order=True):
     return winner
 
 
-def play_episode(game, agents, cond, gui_obj=None, train=True):
+def play_episode(game, agents, gui_obj=None, train=True):
     """Play an entire game updating the environment at each step.
     rewards_log will contain as key the agent's name and as value a list
     containing all the rewards that the agent has received at each step.
@@ -440,7 +442,7 @@ def play_episode(game, agents, cond, gui_obj=None, train=True):
 
             available_actions = game.get_player_actions(player_id)
             if agent.name == "HumanAgent":
-                action = agent.select_action(available_actions, cond)
+                action = agent.select_action(available_actions, gui_obj)
             else:
                 action = agent.select_action(available_actions)
                 gui_obj.agent_play_card(action)
@@ -472,7 +474,7 @@ def play_episode(game, agents, cond, gui_obj=None, train=True):
         # for i, player_id in enumerate(game.get_players_order()):
         # print(f"{agents[player_id].name} gets reward {rewards[i]}")
 
-        game.draw_step(card_images, gui_obj)
+        game.draw_step(card_images)
         gui_obj.empty_table_frame()
 
     # update for the terminal state

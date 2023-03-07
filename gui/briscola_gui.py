@@ -36,6 +36,8 @@ class BriscolaGui:
     agent_hand = []
 
     def __init__(self):
+        self.agent_counter = None
+        self.player_counter = None
         self.log_text = None
         self.count_log_row = "1"
         self.log_frame = None
@@ -229,7 +231,7 @@ class BriscolaGui:
         # initialize the environment
         logger = BriscolaLogger(BriscolaLogger.LoggerLevels.PVP)
         game = brisc.BriscolaGame(gui_obj, 2, logger)
-        game.reset(self.card_images, gui_obj)
+        game.reset(self.card_images)
 
         # initialize the agents
         self.human_agent = HumanAgent()
@@ -253,7 +255,10 @@ class BriscolaGui:
                 self.populate_deck_frame(filename)
                 self.set_briscola(filename)
                 break
-        thread = threading.Thread(target=brisc.play_episode, args=(game, agents, self.cond, gui_obj, False,))
+
+        self.insert_log("Game started...")
+
+        thread = threading.Thread(target=brisc.play_episode, args=(game, agents, gui_obj, False,))
         thread.start()
 
     def populate_menu_frame(self, gui_obj):
@@ -316,8 +321,13 @@ class BriscolaGui:
         """
         Inserts the given text into a new line in the log frame.
         """
-        self.log_text.insert(self.count_log_row + ".0", text + "\n")
+        self.log_text.config(state="normal")
+        self.log_text.insert(self.count_log_row + ".0", "- " + text + "\n")
         self.count_log_row = str(int(self.count_log_row) + 1)
+        # focussing always the last line (with the scroll bar)
+        self.log_text.see("end")
+        # disabling the text widget
+        self.log_text.config(state="disabled")
 
     def create_main_frames(self):
         """
@@ -327,40 +337,28 @@ class BriscolaGui:
         self.agent_frame = ttk.Frame(self.content, width=350, style="Green.TFrame", relief="ridge")
         self.player_frame = ttk.Frame(self.content, width=350, style="Green.TFrame", relief="ridge")
         self.table_frame = ttk.Frame(self.content, width=350, style="Green.TFrame", relief="ridge")
-        self.deck_frame = ttk.Frame(self.content, width=200, style="Green.TFrame", relief="ridge")
-        self.log_frame = ttk.Frame(self.content, width=200, style="Green.TFrame")
+        self.deck_frame = ttk.Frame(self.content, style="Green.TFrame", relief="ridge")
+        self.log_frame = ttk.Frame(self.content, width=300, style="Green.TFrame", relief="ridge")
 
         self.menu_frame.grid(column=0, row=0, rowspan=3)
         self.player_frame.grid(column=1, row=2)
         self.agent_frame.grid(column=1, row=0)
         self.table_frame.grid(column=1, row=1)
-        self.deck_frame.grid(column=2, row=1)
-        self.log_frame.grid(column=2, row=0, sticky="EW")
+        self.deck_frame.grid(column=3, row=1)
+        self.log_frame.grid(column=3, row=0, sticky="EW")
 
         # inserting nested frames
         agent_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame")
         player_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame")
         agent_played_card_frame.grid(column=0, row=0, sticky="NS", padx=self.frame_padding, pady=self.frame_padding)
         player_played_card_frame.grid(column=1, row=0, sticky="NS", padx=self.frame_padding, pady=self.frame_padding)
+
         self.log_text = Text(self.log_frame, background="green", foreground="white", width=30, height=10,
                              padx=self.frame_padding, pady=self.frame_padding)
         self.log_text.grid(column=0, row=0)
         ys = ttk.Scrollbar(self.log_frame, orient='vertical', command=self.log_text.yview)
         self.log_text['yscrollcommand'] = ys.set
         ys.grid(column=1, row=0, sticky="NS")
-
-        # resizing frames with resolution changes
-        self.deck_frame.columnconfigure(0, weight=1)
-        self.deck_frame.columnconfigure(1, weight=1)
-        self.deck_frame.rowconfigure(0, weight=0)
-        self.player_frame.columnconfigure(0, weight=1)
-        self.player_frame.columnconfigure(1, weight=1)
-        self.player_frame.columnconfigure(2, weight=1)
-        self.player_frame.rowconfigure(0, weight=0)
-        self.agent_frame.columnconfigure(0, weight=1)
-        self.agent_frame.columnconfigure(1, weight=1)
-        self.agent_frame.columnconfigure(2, weight=1)
-        self.agent_frame.rowconfigure(0, weight=0)
 
     def start_gui(self, gui_obj):
         """
