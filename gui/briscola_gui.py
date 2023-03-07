@@ -36,6 +36,9 @@ class BriscolaGui:
     agent_hand = []
 
     def __init__(self):
+        self.log_text = None
+        self.count_log_row = "1"
+        self.log_frame = None
         self.new_game_btn = None
         self.human_agent = None
         self.menu_frame = None
@@ -309,28 +312,42 @@ class BriscolaGui:
         except IndexError:
             pass
 
+    def insert_log(self, text):
+        """
+        Inserts the given text into a new line in the log frame.
+        """
+        self.log_text.insert(self.count_log_row + ".0", text + "\n")
+        self.count_log_row = str(int(self.count_log_row) + 1)
+
     def create_main_frames(self):
         """
         Creates the 4 main frames.
         """
-        self.menu_frame = ttk.Frame(self.content, width=100, style="Green.TFrame")
-        self.agent_frame = ttk.Frame(self.content, width=350, style="Green.TFrame")
-        self.player_frame = ttk.Frame(self.content, width=350, style="Green.TFrame")
-        self.table_frame = ttk.Frame(self.content, width=350, style="Green.TFrame")
-        self.deck_frame = ttk.Frame(self.content, width=200, style="Green.TFrame")
+        self.menu_frame = ttk.Frame(self.content, width=100, style="Green.TFrame", relief="ridge")
+        self.agent_frame = ttk.Frame(self.content, width=350, style="Green.TFrame", relief="ridge")
+        self.player_frame = ttk.Frame(self.content, width=350, style="Green.TFrame", relief="ridge")
+        self.table_frame = ttk.Frame(self.content, width=350, style="Green.TFrame", relief="ridge")
+        self.deck_frame = ttk.Frame(self.content, width=200, style="Green.TFrame", relief="ridge")
+        self.log_frame = ttk.Frame(self.content, width=200, style="Green.TFrame")
 
-        self.menu_frame.grid(column=0, row=0, rowspan=3, sticky="NSW")
-        self.player_frame.grid(column=1, row=2, sticky="NS")
-        self.agent_frame.grid(column=1, row=0, sticky="NS")
-        self.table_frame.grid(column=1, row=1, sticky="NS")
-        self.deck_frame.grid(column=2, row=1, sticky="NS")
+        self.menu_frame.grid(column=0, row=0, rowspan=3)
+        self.player_frame.grid(column=1, row=2)
+        self.agent_frame.grid(column=1, row=0)
+        self.table_frame.grid(column=1, row=1)
+        self.deck_frame.grid(column=2, row=1)
+        self.log_frame.grid(column=2, row=0, sticky="EW")
 
-        # --- inserting nested frames ---
-        # here we are inside the frame "table_frame"
+        # inserting nested frames
         agent_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame")
         player_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame")
         agent_played_card_frame.grid(column=0, row=0, sticky="NS", padx=self.frame_padding, pady=self.frame_padding)
         player_played_card_frame.grid(column=1, row=0, sticky="NS", padx=self.frame_padding, pady=self.frame_padding)
+        self.log_text = Text(self.log_frame, background="green", foreground="white", width=30, height=10,
+                             padx=self.frame_padding, pady=self.frame_padding)
+        self.log_text.grid(column=0, row=0)
+        ys = ttk.Scrollbar(self.log_frame, orient='vertical', command=self.log_text.yview)
+        self.log_text['yscrollcommand'] = ys.set
+        ys.grid(column=1, row=0, sticky="NS")
 
         # resizing frames with resolution changes
         self.deck_frame.columnconfigure(0, weight=1)

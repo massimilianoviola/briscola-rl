@@ -1,5 +1,5 @@
-Pillow
+Pillow==9.4.0
 numpy
 matplotlib
-optuna
-torch
+optuna==3.1.0
+torch==1.13.1
