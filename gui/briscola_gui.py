@@ -36,6 +36,8 @@ class BriscolaGui:
     agent_hand = []
 
     def __init__(self):
+        self.agent_score = None
+        self.player_score = None
         self.agent_counter = None
         self.player_counter = None
         self.log_text = None
@@ -256,6 +258,8 @@ class BriscolaGui:
                 self.set_briscola(filename)
                 break
 
+        self.update_player_score(0)
+        self.update_agent_score(0)
         self.insert_log("Game started...")
 
         thread = threading.Thread(target=brisc.play_episode, args=(game, agents, gui_obj, False,))
@@ -269,7 +273,7 @@ class BriscolaGui:
         """
         partial_func = partial(self.start_game, gui_obj)
         self.new_game_btn = ttk.Button(self.menu_frame, text="New game", command=partial_func)
-        self.new_game_btn.grid(column=0, row=0, sticky="NSEW")
+        self.new_game_btn.grid(column=0, row=0, sticky="NS")
 
     def populate_player_frame(self, cards_name):
         """
@@ -329,6 +333,22 @@ class BriscolaGui:
         # disabling the text widget
         self.log_text.config(state="disabled")
 
+    def update_player_score(self, score):
+        """
+        Updates the score counter of the player
+
+        @param score: int that represents the new score of the player
+        """
+        self.player_score["text"] = str(score)
+
+    def update_agent_score(self, score):
+        """
+        Updates the score counter of the agent
+
+        @param score: int that represents the new score of the agent
+        """
+        self.agent_score["text"] = str(score)
+
     def create_main_frames(self):
         """
         Creates the 4 main frames.
@@ -338,14 +358,14 @@ class BriscolaGui:
         self.player_frame = ttk.Frame(self.content, width=350, style="Green.TFrame", relief="ridge")
         self.table_frame = ttk.Frame(self.content, width=350, style="Green.TFrame", relief="ridge")
         self.deck_frame = ttk.Frame(self.content, style="Green.TFrame", relief="ridge")
-        self.log_frame = ttk.Frame(self.content, width=300, style="Green.TFrame", relief="ridge")
+        self.log_frame = ttk.Frame(self.content, style="Green.TFrame", relief="ridge")
 
-        self.menu_frame.grid(column=0, row=0, rowspan=3)
+        self.menu_frame.grid(column=0, row=0, rowspan=3, sticky="W")
         self.player_frame.grid(column=1, row=2)
         self.agent_frame.grid(column=1, row=0)
         self.table_frame.grid(column=1, row=1)
         self.deck_frame.grid(column=3, row=1)
-        self.log_frame.grid(column=3, row=0, sticky="EW")
+        self.log_frame.grid(column=3, row=0)
 
         # inserting nested frames
         agent_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame")
@@ -353,12 +373,26 @@ class BriscolaGui:
         agent_played_card_frame.grid(column=0, row=0, sticky="NS", padx=self.frame_padding, pady=self.frame_padding)
         player_played_card_frame.grid(column=1, row=0, sticky="NS", padx=self.frame_padding, pady=self.frame_padding)
 
-        self.log_text = Text(self.log_frame, background="green", foreground="white", width=30, height=10,
-                             padx=self.frame_padding, pady=self.frame_padding)
-        self.log_text.grid(column=0, row=0)
+        self.log_text = Text(self.log_frame, background="green", foreground="white", width=35, height=10,
+                             padx=self.frame_padding, pady=self.frame_padding, state="disabled")
+        self.log_text.grid(column=0, row=0, sticky="EW")
         ys = ttk.Scrollbar(self.log_frame, orient='vertical', command=self.log_text.yview)
         self.log_text['yscrollcommand'] = ys.set
         ys.grid(column=1, row=0, sticky="NS")
+
+        self.player_score = ttk.Label(self.content, text="", font=("Arial", 15), foreground="white",
+                                      background="green")
+        self.player_score.grid(column=2, row=2, sticky="W", padx=30)
+        self.agent_score = ttk.Label(self.content, text="", font=("Arial", 15), foreground="white",
+                                     background="green")
+        self.agent_score.grid(column=2, row=0, sticky="W", padx=30)
+
+        self.log_frame.columnconfigure(0, weight=1)
+        self.content.columnconfigure(0, weight=2)
+        self.content.columnconfigure(1, weight=0)
+        self.content.columnconfigure(2, weight=0)
+        self.content.columnconfigure(3, weight=1)
+        self.log_frame.columnconfigure(0, weight=1)
 
     def start_gui(self, gui_obj):
         """
