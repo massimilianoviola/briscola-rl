@@ -232,8 +232,8 @@ class BriscolaGui:
 
         # initialize the environment
         logger = BriscolaLogger(BriscolaLogger.LoggerLevels.PVP)
-        game = brisc.BriscolaGame(gui_obj, 2, logger)
-        game.reset(self.card_images)
+        game = brisc.BriscolaGame(2, logger, gui_obj)
+        game.reset()
 
         # initialize the agents
         self.human_agent = HumanAgent()
@@ -262,7 +262,7 @@ class BriscolaGui:
         self.update_agent_score(0)
         self.insert_log("Game started...")
 
-        thread = threading.Thread(target=brisc.play_episode, args=(game, agents, gui_obj, False,))
+        thread = threading.Thread(target=brisc.play_episode, args=(game, agents, gui_obj, False))
         thread.start()
 
     def populate_menu_frame(self, gui_obj):
