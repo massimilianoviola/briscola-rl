@@ -79,10 +79,12 @@ class BriscolaDeck:
             )
         self.briscola = briscola
 
-    def draw_card(self):
+    def draw_card(self, gui_obj=None):
         """If the deck is not empty, draw a card, otherwise return the briscola or nothing."""
         if self.current_deck:
             drawn_card = self.current_deck.pop()
+            if gui_obj is not None:
+                gui_obj.update_deck_count(len(self.current_deck))
         else:
             drawn_card = self.briscola
             self.briscola = None
@@ -125,7 +127,7 @@ class BriscolaPlayer:
 
     def draw(self, deck, gui_obj):
         """Try to draw a card from the deck."""
-        new_card = deck.draw_card()
+        new_card = deck.draw_card(gui_obj)
         if gui_obj is not None:
             filename = gui_obj.find_card_name(new_card, gui_obj.card_images)
             if self.id == 0:
@@ -186,7 +188,7 @@ class BriscolaGame:
         self.players_order = self.get_players_order()
 
         # initialize the briscola
-        self.briscola = self.deck.draw_card()
+        self.briscola = self.deck.draw_card(self.gui_obj)
         self.deck.place_briscola(self.briscola)
 
         # initialize players' hands

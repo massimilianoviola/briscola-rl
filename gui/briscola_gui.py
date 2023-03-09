@@ -34,8 +34,13 @@ class BriscolaGui:
     # lists containing filename of card images
     player_hand = []
     agent_hand = []
+    image_size = (98, 162)
 
     def __init__(self):
+        self.briscola_img = None
+        self.fixed_briscola_frame = None
+        self.fixed_briscola = None
+        self.deck_count = None
         self.agent_score = None
         self.player_score = None
         self.agent_counter = None
@@ -51,9 +56,8 @@ class BriscolaGui:
         content_padding = (50, 50, 50, 50)  # w-n-e-s
         style = ttk.Style()
         style.configure("Green.TFrame", background="green")
-        style.configure("Green.TButton", foreground="green", background="green", padding=-1)
-        style.configure("Black.TFrame", background="black")
-        style.configure("Black.TButton", foreground="black", background="black", padding=-1)
+        style.configure("Green.TButton", foreground="white", background="green", padding=-1)
+        style.configure("Retro.TLabel", foreground="white", padding=-1)
         self.content = ttk.Frame(self.root, padding=content_padding, style="Green.TFrame")
         self.content.grid(column=0, row=0, sticky="NSEW")
         # root and content resizing when resolution changes
@@ -64,10 +68,10 @@ class BriscolaGui:
         self.content.rowconfigure(1, weight=1)
         self.content.rowconfigure(2, weight=1)
         # loading and resizing all images
-        image_size = (98, 162)
+
         for filename in os.listdir("card_images"):
             img_path = os.path.join("card_images", filename)
-            img = Image.open(img_path).resize(image_size, resample=Resampling.LANCZOS)
+            img = Image.open(img_path).resize(self.image_size, resample=Resampling.LANCZOS)
             self.card_images[filename] = (ImageTk.PhotoImage(image=img))
 
     @classmethod
@@ -107,11 +111,23 @@ class BriscolaGui:
 
     def set_briscola(self, briscola_name):
         """
-        Set the filename of the Briscola image
+        Sets the filename of the Briscola image and populates "fixed_briscola_frame"
 
-        @param briscola_name the image filename
+        @param briscola_name the filename of the briscola image
         """
         self.briscola_name = briscola_name
+        img_path = os.path.join("card_images", self.briscola_name)
+        new_width = int(self.image_size[0] / 1.2)
+        new_height = int(self.image_size[1] / 1.2)
+        img = Image.open(img_path).resize((new_width, new_height), resample=Resampling.LANCZOS)
+        self.briscola_img = (ImageTk.PhotoImage(image=img))
+        self.fixed_briscola_frame = ttk.Frame(self.content, style="Green.TFrame", height=300)
+        self.fixed_briscola_frame.grid(column=3, row=2)
+        self.fixed_briscola = ttk.Label(self.fixed_briscola_frame, style="Green.TButton",
+                                        image=self.briscola_img)
+        self.fixed_briscola.grid(column=0, row=1)
+        briscola_text = ttk.Label(self.fixed_briscola_frame, text="Briscola", style="Counter.TLabel")
+        briscola_text.grid(column=0, row=0)
 
     def player_play_card(self, index):
         """
@@ -165,22 +181,12 @@ class BriscolaGui:
             child.destroy()
         self.populate_agent_frame()
 
-    def empty_deck(self):
+    def empty_deck_frame(self):
         """
         This function loads the image "Deck_Finito.jpg" into the frame "deck_frame".
         """
-        try:
-            self.deck_frame.winfo_children()[1].destroy()
-        except IndexError:
-            self.deck_frame.winfo_children()[0].destroy()
-        empty_deck_label = ttk.Label(self.deck_frame, style="Green.TButton", image=self.card_images["Deck_Finito.jpg"])
-        empty_deck_label.grid(column=1, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
-
-    def empty_briscola(self):
-        """
-        This function removes the image of the Briscola from the frame "deck_frame".
-        """
-        self.deck_frame.winfo_children()[0].destroy()
+        for child in self.deck_frame.winfo_children():
+            child.destroy()
 
     def agent_draw_card(self, card_name):
         """
@@ -188,14 +194,13 @@ class BriscolaGui:
         """
         if card_name is None:
             return
-        card = ttk.Label(self.agent_frame, style="Green.TButton", image=self.card_images["Carte_Napoletane_retro.jpg"])
+        card = ttk.Label(self.agent_frame, style="Retro.TLabel", image=self.card_images["Carte_Napoletane_retro.jpg"])
 
         card.grid(column=len(self.agent_hand), row=0, padx=self.card_label_padding,
                   pady=self.card_label_padding)
         self.agent_hand.append(card_name)
         if card_name == self.briscola_name:
-            self.empty_briscola()
-            self.empty_deck()
+            self.empty_deck_frame()
 
     def player_draw_card(self, card_name):
         """
@@ -215,8 +220,7 @@ class BriscolaGui:
                        pady=self.card_label_padding)
         self.player_hand.append(card_name)
         if card_name == self.briscola_name:
-            self.empty_briscola()
-            self.empty_deck()
+            self.empty_deck_frame()
 
     def start_game(self, gui_obj):
         """Play against one of the intelligent agents."""
@@ -260,6 +264,7 @@ class BriscolaGui:
 
         self.update_player_score(0)
         self.update_agent_score(0)
+        self.update_deck_count(33)
         self.insert_log("Game started...")
 
         thread = threading.Thread(target=brisc.play_episode, args=(game, agents, gui_obj, False))
@@ -291,19 +296,22 @@ class BriscolaGui:
         """
         Inserts images of the deck and of the briscola card into the frame "deck_frame".
         """
+        empty_label = ttk.Label(self.deck_frame, background="green", width=15)
         briscola_label = ttk.Label(self.deck_frame, style="Green.TButton", image=self.card_images[briscola_name])
-        deck_label = ttk.Label(self.deck_frame, style="Green.TButton",
+        briscola_label.place(relx=0.3, rely=0.4, anchor="center")
+        deck_label = ttk.Label(self.deck_frame, style="Retro.TLabel",
                                image=self.card_images["Carte_Napoletane_retro.jpg"])
 
-        briscola_label.grid(column=0, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding)
-        deck_label.grid(column=1, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding)
+        # briscola_label.grid(column=0, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding)
+        empty_label.grid(column=0, row=0)
+        deck_label.grid(column=1, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding+10)
 
     def populate_agent_frame(self):
         """
         Inserts 3 hidden cards into "agent_frame".
         """
         for i in range(0, len(self.agent_hand)):
-            card = ttk.Label(self.agent_frame, style="Green.TButton",
+            card = ttk.Label(self.agent_frame, style="Retro.TLabel",
                              image=self.card_images["Carte_Napoletane_retro.jpg"])
             card.grid(column=i, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
 
@@ -349,16 +357,24 @@ class BriscolaGui:
         """
         self.agent_score["text"] = str(score)
 
+    def update_deck_count(self, count):
+        """
+        Updates the number of cards inside the deck
+
+        @param count: int that represents the new score of the agent
+        """
+        self.deck_count["text"] = str(count)
+
     def create_main_frames(self):
         """
         Creates the 4 main frames.
         """
-        self.menu_frame = ttk.Frame(self.content, width=100, style="Green.TFrame", relief="ridge")
-        self.agent_frame = ttk.Frame(self.content, width=350, style="Green.TFrame", relief="ridge")
-        self.player_frame = ttk.Frame(self.content, width=350, style="Green.TFrame", relief="ridge")
-        self.table_frame = ttk.Frame(self.content, width=350, style="Green.TFrame", relief="ridge")
-        self.deck_frame = ttk.Frame(self.content, style="Green.TFrame", relief="ridge")
-        self.log_frame = ttk.Frame(self.content, style="Green.TFrame", relief="ridge")
+        self.menu_frame = ttk.Frame(self.content, style="Green.TFrame")
+        self.agent_frame = ttk.Frame(self.content, style="Green.TFrame")
+        self.player_frame = ttk.Frame(self.content, style="Green.TFrame")
+        self.table_frame = ttk.Frame(self.content, style="Green.TFrame")
+        self.deck_frame = ttk.Frame(self.content, style="Green.TFrame")
+        self.log_frame = ttk.Frame(self.content, style="Green.TFrame")
 
         self.menu_frame.grid(column=0, row=0, rowspan=3, sticky="W")
         self.player_frame.grid(column=1, row=2)
@@ -380,15 +396,18 @@ class BriscolaGui:
         self.log_text['yscrollcommand'] = ys.set
         ys.grid(column=1, row=0, sticky="NS")
 
-        self.player_score = ttk.Label(self.content, text="", font=("Arial", 15), foreground="white",
-                                      background="green")
+        # counters
+        style = ttk.Style()
+        style.configure("Counter.TLabel", font=("Arial", 15), background="green", foreground="white")
+        self.player_score = ttk.Label(self.content, style="Counter.TLabel")
         self.player_score.grid(column=2, row=2, sticky="W", padx=30)
-        self.agent_score = ttk.Label(self.content, text="", font=("Arial", 15), foreground="white",
-                                     background="green")
+        self.agent_score = ttk.Label(self.content, style="Counter.TLabel")
         self.agent_score.grid(column=2, row=0, sticky="W", padx=30)
+        self.deck_count = ttk.Label(self.deck_frame, style="Counter.TLabel")
+        self.deck_count.grid(column=1, row=1)
 
         self.log_frame.columnconfigure(0, weight=1)
-        self.content.columnconfigure(0, weight=2)
+        self.content.columnconfigure(0, weight=1)
         self.content.columnconfigure(1, weight=0)
         self.content.columnconfigure(2, weight=0)
         self.content.columnconfigure(3, weight=1)
