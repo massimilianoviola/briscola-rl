@@ -48,6 +48,7 @@ class BriscolaGui:
     image_size = (98, 162)
 
     def __init__(self):
+        self.saved_commands = None
         self.briscola_img = None
         self.fixed_briscola_frame = None
         self.fixed_briscola = None
@@ -78,8 +79,6 @@ class BriscolaGui:
         self.content.rowconfigure(0, weight=1)
         self.content.rowconfigure(1, weight=1)
         self.content.rowconfigure(2, weight=1)
-        # loading and resizing all images
-
         names = ['01_Asso_di_denari.jpg', '02_Due_di_denari.jpg', '03_Tre_di_denari.jpg', '04_Quattro_di_denari.jpg',
                  '05_Cinque_di_denari.jpg', '06_Sei_di_denari.jpg', '07_Sette_di_denari.jpg', '08_Fante_di_denari.jpg',
                  '09_Cavallo_di_denari.jpg', '10_Re_di_denari.jpg', '11_Asso_di_coppe.jpg', '12_Due_di_coppe.jpg',
@@ -91,7 +90,6 @@ class BriscolaGui:
                  '33_Tre_di_bastoni.jpg', '34_Quattro_di_bastoni.jpg', '35_Cinque_di_bastoni.jpg',
                  '36_Sei_di_bastoni.jpg', '37_Sette_di_bastoni.jpg', '38_Fante_di_bastoni.jpg',
                  '39_Cavallo_di_bastoni.jpg', '40_Re_di_bastoni.jpg', 'Carte_Napoletane_retro.jpg', 'Deck_Finito.jpg']
-
         for filename in names:
             img_path = resource_path("card_images/" + filename)
             img = Image.open(img_path).resize(self.image_size, resample=Resampling.LANCZOS)
@@ -144,24 +142,16 @@ class BriscolaGui:
 
         @param index: index of the played card (can be [0, 2])
         """
-        # creating and showing a label that represents the player played card into the table frame
-        try:
-            self.table_frame.winfo_children()[1].winfo_children()[0].destroy()
-        except IndexError:
-            pass
         new_card = ttk.Label(self.table_frame.winfo_children()[1], style="Green.TButton",
                              image=self.card_images[self.player_hand[index]])
         new_card.grid(column=0, row=0)
-
         # destroying the card objects from the player frame and repopulating it
         self.player_hand.pop(index)
-        new_player_hand = []
-        for card in self.player_hand:
-            new_player_hand.append(card)
-        self.player_hand.clear()
-        for child in self.player_frame.winfo_children():
-            child.destroy()
-        self.populate_player_frame(new_player_hand)
+        self.player_frame.winfo_children()[index].destroy()
+        for i in range(index, len(self.player_frame.winfo_children())):
+            partial_func = partial(self.player_play_card, i)
+            self.player_frame.winfo_children()[i]["command"] = partial_func
+            self.player_frame.winfo_children()[i].grid(column=i, row=0)
 
         # notify the game that a card has being played
         with self.cond:
@@ -174,21 +164,13 @@ class BriscolaGui:
 
         @param index: index of the played card (can be [0, 2])
         """
-        # time.sleep(1)
-        try:
-            self.table_frame.winfo_children()[0].winfo_children()[0].destroy()
-        except IndexError:
-            pass
         # creating and showing a label that represents the agent played card into the table frame
         card = ttk.Label(self.table_frame.winfo_children()[0], style="Green.TButton",
                          image=self.card_images[self.agent_hand[index]])
         card.grid(column=0, row=0)
         # updating the agent hand
         self.agent_hand.pop(index)
-        # removing one card from the agent frame
-        for child in self.agent_frame.winfo_children():
-            child.destroy()
-        self.populate_agent_frame()
+        self.agent_frame.winfo_children()[len(self.agent_hand)].destroy()
 
     def empty_deck_frame(self):
         """
@@ -230,6 +212,20 @@ class BriscolaGui:
         self.player_hand.append(card_name)
         if card_name == self.briscola_name:
             self.empty_deck_frame()
+
+    def release(self):
+        with self.cond:
+            self.cond.notify()
+        for i in range(0, len(self.player_frame.winfo_children())):
+            self.player_frame.winfo_children()[i]["command"] = self.saved_commands[i]
+        self.saved_commands = []
+
+    def notify_after(self, ms):
+        self.saved_commands = []
+        for child in self.player_frame.winfo_children():
+            self.saved_commands.append(child["command"])
+            child["command"] = 0
+        self.root.after(ms, self.release)
 
     def start_game(self, gui_obj):
         """Play against one of the intelligent agents."""
@@ -289,18 +285,6 @@ class BriscolaGui:
         self.new_game_btn = ttk.Button(self.menu_frame, text="New game", command=partial_func)
         self.new_game_btn.grid(column=0, row=0, sticky="NS")
 
-    def populate_player_frame(self, cards_name):
-        """
-        Inserts cards into the frame "player_frame".
-        @param cards_name: array containing image filenames
-        """
-        for i in range(0, len(cards_name)):
-            partial_func = partial(self.player_play_card, i)
-            card = ttk.Button(self.player_frame, style="Green.TButton", image=self.card_images[cards_name[i]],
-                              command=partial_func)
-            self.player_hand.append(cards_name[i])
-            card.grid(column=i, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
-
     def populate_deck_frame(self, briscola_name):
         """
         Inserts images of the deck and of the briscola card into the frame "deck_frame".
@@ -313,16 +297,7 @@ class BriscolaGui:
 
         # briscola_label.grid(column=0, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding)
         empty_label.grid(column=0, row=0)
-        deck_label.grid(column=1, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding+10)
-
-    def populate_agent_frame(self):
-        """
-        Inserts 3 hidden cards into "agent_frame".
-        """
-        for i in range(0, len(self.agent_hand)):
-            card = ttk.Label(self.agent_frame, style="Retro.TLabel",
-                             image=self.card_images["Carte_Napoletane_retro.jpg"])
-            card.grid(column=i, row=0, padx=self.card_label_padding, pady=self.card_label_padding)
+        deck_label.grid(column=1, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding + 10)
 
     def empty_table_frame(self):
         """
@@ -421,6 +396,12 @@ class BriscolaGui:
         self.content.columnconfigure(2, weight=0)
         self.content.columnconfigure(3, weight=1)
         self.log_frame.columnconfigure(0, weight=1)
+
+    def wait(self):
+        """
+
+        """
+        self.root.after(2000)
 
     def start_gui(self, gui_obj):
         """

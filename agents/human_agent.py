@@ -50,7 +50,6 @@ class HumanAgent:
             except ValueError:
                 print("Error, not a number!!")
                 action = random.choice(actions)
-
             if action not in actions:
                 print("Error, out of bounds action selected!!")
                 action = random.choice(actions)

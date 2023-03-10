@@ -1,4 +1,6 @@
 import random
+import time
+
 from utils import BriscolaLogger
 
 
@@ -251,6 +253,8 @@ class BriscolaGame:
         self.logger.DEBUG(f"Player {player_id} chose action {action}.")
 
         card = player.play_card(action)
+        if self.gui_obj is not None:
+            self.gui_obj.insert_log(f"Player {player_id} played {card.name}.")
         self.logger.PVP(f"Player {player_id} played {card.name}.")
 
         self.played_cards.append(card)
@@ -299,6 +303,8 @@ class BriscolaGame:
         winner_player = self.players[winner_player_id]
 
         self.update_game(winner_player, points, self.gui_obj)
+        if self.gui_obj is not None:
+            self.gui_obj.insert_log(f"Player {winner_player_id} wins {points} points with {strongest_card.name}.")
         self.logger.PVP(
             f"Player {winner_player_id} wins {points} points with {strongest_card.name}."
         )
@@ -448,8 +454,6 @@ def play_episode(game, agents, gui_obj=None, train=True):
                 action = agent.select_action(available_actions, gui_obj)
             else:
                 action = agent.select_action(available_actions)
-                if gui_obj is not None:
-                    gui_obj.agent_play_card(action)
 
             # if agent.name == "QLearningAgent":
             #   print(f"state: {agent.state}")
@@ -459,6 +463,21 @@ def play_episode(game, agents, gui_obj=None, train=True):
             # print(f"{agent.name} plays {player.hand[action]} ({action})")
 
             game.play_step(action, player_id)
+            if gui_obj is not None and player_id == 0:
+                gui_obj.notify_after(1000)
+                with gui_obj.cond:
+                    gui_obj.cond.wait()
+            if gui_obj is not None and player_id == 1:
+                if i == 0:
+                    gui_obj.notify_after(1000)
+                    with gui_obj.cond:
+                        gui_obj.cond.wait()
+                    gui_obj.agent_play_card(action)
+                else:
+                    gui_obj.agent_play_card(action)
+                    gui_obj.notify_after(1000)
+                    with gui_obj.cond:
+                        gui_obj.cond.wait()
 
             # Update agents deck since it can only observe the environment when
             # it's its turn. So for example if it's the first one to play he
