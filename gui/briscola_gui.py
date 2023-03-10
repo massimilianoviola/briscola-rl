@@ -48,6 +48,10 @@ class BriscolaGui:
     image_size = (98, 162)
 
     def __init__(self):
+        self.agent_score_text = None
+        self.agent_score_frame = None
+        self.player_score_text = None
+        self.player_score_frame = None
         self.saved_commands = None
         self.briscola_img = None
         self.fixed_briscola_frame = None
@@ -64,12 +68,14 @@ class BriscolaGui:
         self.human_agent = None
         self.menu_frame = None
         self.root = Tk()
-        self.root.minsize(900, 700)
+        self.root.minsize(1100, 700)
+        self.root.maxsize(1100, 700)
         content_padding = (50, 50, 50, 50)  # w-n-e-s
         style = ttk.Style()
         style.configure("Green.TFrame", background="green")
         style.configure("Green.TButton", foreground="white", background="green", padding=-1)
         style.configure("Retro.TLabel", foreground="white", padding=-1)
+        style.configure("CounterText.TLabel", foreground="white", background="green", font=("Arial", 12))
         self.content = ttk.Frame(self.root, padding=content_padding, style="Green.TFrame")
         self.content.grid(column=0, row=0, sticky="NSEW")
         # root and content resizing when resolution changes
@@ -134,7 +140,7 @@ class BriscolaGui:
                                         image=self.briscola_img)
         self.fixed_briscola.grid(column=0, row=1)
         briscola_text = ttk.Label(self.fixed_briscola_frame, text="Briscola", style="Counter.TLabel")
-        briscola_text.grid(column=0, row=0)
+        briscola_text.grid(column=0, row=0, pady=1)
 
     def player_play_card(self, index):
         """
@@ -271,6 +277,8 @@ class BriscolaGui:
         self.update_agent_score(0)
         self.update_deck_count(33)
         self.insert_log("Game started...")
+        self.player_score_text["text"] = "Human score"
+        self.agent_score_text["text"] = "Agent score"
 
         thread = threading.Thread(target=brisc.play_episode, args=(game, agents, gui_obj, False))
         thread.start()
@@ -282,7 +290,9 @@ class BriscolaGui:
         @param gui_obj:
         """
         partial_func = partial(self.start_game, gui_obj)
-        self.new_game_btn = ttk.Button(self.menu_frame, text="New game", command=partial_func)
+        style = ttk.Style()
+        style.configure("NewGame.TButton", font=("Helvetica", 10))
+        self.new_game_btn = ttk.Button(self.menu_frame, text="New game", command=partial_func, style="NewGame.TButton")
         self.new_game_btn.grid(column=0, row=0, sticky="NS")
 
     def populate_deck_frame(self, briscola_name):
@@ -383,19 +393,28 @@ class BriscolaGui:
         # counters
         style = ttk.Style()
         style.configure("Counter.TLabel", font=("Arial", 15), background="green", foreground="white")
-        self.player_score = ttk.Label(self.content, style="Counter.TLabel")
-        self.player_score.grid(column=2, row=2, sticky="W", padx=30)
-        self.agent_score = ttk.Label(self.content, style="Counter.TLabel")
-        self.agent_score.grid(column=2, row=0, sticky="W", padx=30)
+
+        self.player_score_frame = ttk.Frame(self.content, style="Green.TFrame")
+        self.player_score = ttk.Label(self.player_score_frame, style="Counter.TLabel")
+        self.player_score_frame.grid(column=2, row=2, sticky="W", padx=30)
+        self.player_score_text = ttk.Label(self.player_score_frame, style="CounterText.TLabel")
+        self.player_score_text.grid(column=0, row=0)
+        self.player_score.grid(column=0, row=1)
+
+        self.agent_score_frame = ttk.Frame(self.content, style="Green.TFrame")
+        self.agent_score = ttk.Label(self.agent_score_frame, style="Counter.TLabel")
+        self.agent_score_frame.grid(column=2, row=0, sticky="W", padx=30)
+        self.agent_score_text = ttk.Label(self.agent_score_frame, style="CounterText.TLabel")
+        self.agent_score_text.grid(column=0, row=0)
+        self.agent_score.grid(column=0, row=1)
+
         self.deck_count = ttk.Label(self.deck_frame, style="Counter.TLabel")
         self.deck_count.grid(column=1, row=1)
 
-        self.log_frame.columnconfigure(0, weight=1)
-        self.content.columnconfigure(0, weight=1)
-        self.content.columnconfigure(1, weight=0)
+        self.content.columnconfigure(0, weight=0)
+        self.content.columnconfigure(1, weight=1)
         self.content.columnconfigure(2, weight=0)
-        self.content.columnconfigure(3, weight=1)
-        self.log_frame.columnconfigure(0, weight=1)
+        self.content.columnconfigure(3, weight=0)
 
     def wait(self):
         """

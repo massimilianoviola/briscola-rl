@@ -254,7 +254,10 @@ class BriscolaGame:
 
         card = player.play_card(action)
         if self.gui_obj is not None:
-            self.gui_obj.insert_log(f"Player {player_id} played {card.name}.")
+            if player_id == 0:
+                self.gui_obj.insert_log(f"Human played {card.name}.")
+            else:
+                self.gui_obj.insert_log(f"Agent played {card.name}.")
         self.logger.PVP(f"Player {player_id} played {card.name}.")
 
         self.played_cards.append(card)
@@ -304,7 +307,10 @@ class BriscolaGame:
 
         self.update_game(winner_player, points, self.gui_obj)
         if self.gui_obj is not None:
-            self.gui_obj.insert_log(f"Player {winner_player_id} wins {points} points with {strongest_card.name}.")
+            if winner_player_id == 0:
+                self.gui_obj.insert_log(f"Human wins {points} points with {strongest_card.name}.")
+            else:
+                self.gui_obj.insert_log(f"Agent wins {points} points with {strongest_card.name}.")
         self.logger.PVP(
             f"Player {winner_player_id} wins {points} points with {strongest_card.name}."
         )
