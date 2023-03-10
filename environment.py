@@ -424,8 +424,6 @@ def play_episode(game, agents, gui_obj=None, train=True):
         if agent.name != "HumanAgent":
             agent.reset()
 
-    if gui_obj is not None:
-        card_images = gui_obj.load_images()
     while not game.check_end_game():
         # action step
         players_order = game.get_players_order()

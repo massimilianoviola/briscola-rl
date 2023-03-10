@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import threading
 import time
 from functools import partial
@@ -14,6 +15,16 @@ from agents.ai_agent import AIAgent
 from agents.human_agent import HumanAgent
 from agents.q_agent import QAgent
 from utils import NetworkTypes, BriscolaLogger
+
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 
 played_card = None
 
@@ -69,24 +80,22 @@ class BriscolaGui:
         self.content.rowconfigure(2, weight=1)
         # loading and resizing all images
 
-        for filename in os.listdir("card_images"):
-            img_path = os.path.join("card_images", filename)
+        names = ['01_Asso_di_denari.jpg', '02_Due_di_denari.jpg', '03_Tre_di_denari.jpg', '04_Quattro_di_denari.jpg',
+                 '05_Cinque_di_denari.jpg', '06_Sei_di_denari.jpg', '07_Sette_di_denari.jpg', '08_Fante_di_denari.jpg',
+                 '09_Cavallo_di_denari.jpg', '10_Re_di_denari.jpg', '11_Asso_di_coppe.jpg', '12_Due_di_coppe.jpg',
+                 '13_Tre_di_coppe.jpg', '14_Quattro_di_coppe.jpg', '15_Cinque_di_coppe.jpg', '16_Sei_di_coppe.jpg',
+                 '17_Sette_di_coppe.jpg', '18_Fante_di_coppe.jpg', '19_Cavallo_di_coppe.jpg', '20_Re_di_coppe.jpg',
+                 '21_Asso_di_spade.jpg', '22_Due_di_spade.jpg', '23_Tre_di_spade.jpg', '24_Quattro_di_spade.jpg',
+                 '25_Cinque_di_spade.jpg', '26_Sei_di_spade.jpg', '27_Sette_di_spade.jpg', '28_Fante_di_spade.jpg',
+                 '29_Cavallo_di_spade.jpg', '30_Re_di_spade.jpg', '31_Asso_di_bastoni.jpg', '32_Due_di_bastoni.jpg',
+                 '33_Tre_di_bastoni.jpg', '34_Quattro_di_bastoni.jpg', '35_Cinque_di_bastoni.jpg',
+                 '36_Sei_di_bastoni.jpg', '37_Sette_di_bastoni.jpg', '38_Fante_di_bastoni.jpg',
+                 '39_Cavallo_di_bastoni.jpg', '40_Re_di_bastoni.jpg', 'Carte_Napoletane_retro.jpg', 'Deck_Finito.jpg']
+
+        for filename in names:
+            img_path = resource_path("card_images/" + filename)
             img = Image.open(img_path).resize(self.image_size, resample=Resampling.LANCZOS)
             self.card_images[filename] = (ImageTk.PhotoImage(image=img))
-
-    @classmethod
-    def load_images(cls):
-        """
-        @return: list of all card images
-        """
-        card_images = {}
-        # loading and resizing all images
-        image_size = (98, 162)
-        for filename in os.listdir("card_images"):
-            img_path = os.path.join("card_images", filename)
-            img = Image.open(img_path).resize(image_size, resample=Resampling.LANCZOS)
-            card_images[filename] = (ImageTk.PhotoImage(image=img))
-        return card_images
 
     @classmethod
     def find_card_name(cls, card, card_images):
@@ -116,7 +125,7 @@ class BriscolaGui:
         @param briscola_name the filename of the briscola image
         """
         self.briscola_name = briscola_name
-        img_path = os.path.join("card_images", self.briscola_name)
+        img_path = resource_path("card_images/" + self.briscola_name)
         new_width = int(self.image_size[0] / 1.2)
         new_height = int(self.image_size[1] / 1.2)
         img = Image.open(img_path).resize((new_width, new_height), resample=Resampling.LANCZOS)
