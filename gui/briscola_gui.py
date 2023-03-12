@@ -1,9 +1,8 @@
 import argparse
-import ctypes
 import os
+import pathlib
 import sys
 import threading
-import time
 from functools import partial
 from tkinter import *
 from tkinter import ttk, messagebox
@@ -84,6 +83,7 @@ class BriscolaGui:
         style.configure("NewGame.TButton", font=("Arial", 15), background='green')
         style.configure("Restart.TButton", font=("Arial", 10), background='green')
         style.configure("CounterText.TLabel", foreground="white", background="green", font=("Arial", 12))
+        style.configure("WinnerText.TLabel", foreground="white", background="green", font=("Arial", 18))
 
         # gathering card images
         names = ['01_Asso_di_denari.jpg', '02_Due_di_denari.jpg', '03_Tre_di_denari.jpg', '04_Quattro_di_denari.jpg',
@@ -155,8 +155,8 @@ class BriscolaGui:
         """
         new_card = ttk.Label(self.table_frame.winfo_children()[1], style="Card.TButton",
                              image=self.card_images[self.player_hand[index]])
-        new_card.grid(column=0, row=0)
-        # destroying the card objects from the player frame and repopulating it
+        new_card.grid(column=0, row=0, sticky="NSEW", padx=5, pady=5)
+
         self.player_hand.pop(index)
         self.player_frame.winfo_children()[index].destroy()
         for i in range(index, len(self.player_frame.winfo_children())):
@@ -178,7 +178,7 @@ class BriscolaGui:
         # creating and showing a label that represents the agent played card into the table frame
         card = ttk.Label(self.table_frame.winfo_children()[0], style="Card.TButton",
                          image=self.card_images[self.agent_hand[index]])
-        card.grid(column=0, row=0)
+        card.grid(column=0, row=0, sticky="NSEW", padx=5, pady=5)
         # updating the agent hand
         self.agent_hand.pop(index)
         self.agent_frame.winfo_children()[len(self.agent_hand)].destroy()
@@ -238,8 +238,13 @@ class BriscolaGui:
             child["command"] = 0
         self.root.after(ms, self.release)
 
-    def start_game(self, gui_obj):
+    def start_game(self, gui_obj, restart=False):
         """Play against one of the intelligent agents."""
+        if restart:
+            try:
+                self.game.end_game()
+            except ValueError:
+                pass
         parser = argparse.ArgumentParser()
 
         parser.add_argument("--model_dir", default=None,
@@ -251,7 +256,8 @@ class BriscolaGui:
 
         # initialize the environment
         logger = BriscolaLogger(BriscolaLogger.LoggerLevels.PVP)
-        self.game = brisc.BriscolaGame(2, logger, gui_obj)
+        if not restart:
+            self.game = brisc.BriscolaGame(2, logger, gui_obj)
         self.game.reset()
 
         # initialize the agents
@@ -335,6 +341,12 @@ class BriscolaGui:
         # disabling the text widget
         self.log_text.config(state="disabled")
 
+    def reset_log(self):
+        """
+        Empties the log.
+        """
+        self.log_text.delete('1.0', END)
+
     def update_player_score(self, score):
         """
         Updates the score counter of the player
@@ -359,6 +371,15 @@ class BriscolaGui:
         """
         self.deck_count["text"] = str(count)
 
+    def insert_winner(self, player_name):
+        """
+        Shows the winner in the table frame through a label.
+        """
+        for child in self.table_frame.winfo_children():
+            child.destroy()
+        label = ttk.Label(self.table_frame, text=player_name + " wins!", style="WinnerText.TLabel")
+        label.grid(column=0, row=0, sticky="EW")
+
     def create_main_frames(self):
         """
         Creates the 4 main frames.
@@ -371,7 +392,7 @@ class BriscolaGui:
         self.menu_frame = ttk.Frame(self.content, style="Green.TFrame")
         self.agent_frame = ttk.Frame(self.content, style="Green.TFrame")
         self.player_frame = ttk.Frame(self.content, style="Green.TFrame")
-        self.table_frame = ttk.Frame(self.content, style="Green.TFrame")
+        self.table_frame = ttk.Frame(self.content, style="Green.TFrame", relief="sunken")
         self.deck_frame = ttk.Frame(self.content, style="Green.TFrame")
         self.log_frame = ttk.Frame(self.content, style="Green.TFrame")
 
@@ -383,10 +404,10 @@ class BriscolaGui:
         self.log_frame.grid(column=3, row=0)
 
         # inserting nested frames
-        agent_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame")
-        player_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame")
-        agent_played_card_frame.grid(column=0, row=0, sticky="NS", padx=self.frame_padding, pady=self.frame_padding)
-        player_played_card_frame.grid(column=1, row=0, sticky="NS", padx=self.frame_padding, pady=self.frame_padding)
+        agent_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame", width=120, height=180)
+        player_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame", width=120, height=180)
+        agent_played_card_frame.grid(column=0, row=0, sticky="NSW", padx=self.frame_padding, pady=self.frame_padding)
+        player_played_card_frame.grid(column=1, row=0, sticky="NSE", padx=self.frame_padding, pady=self.frame_padding)
 
         self.log_text = Text(self.log_frame, background="green", foreground="white", width=35, height=10,
                              padx=self.frame_padding, pady=self.frame_padding, state="disabled")
@@ -425,42 +446,42 @@ class BriscolaGui:
         """
         Clears all frames, resets the running game and starts a new game calling the function "start_game"
         """
-        # self.content.destroy()
-        #
-        #
-        # self.new_game_btn = None
-        # self.deck_frame = None
-        # self.table_frame = None
-        # self.agent_frame = None
-        # self.player_frame = None
-        # self.agent_score_text = None
-        # self.agent_score_frame = None
-        # self.player_score_text = None
-        # self.player_score_frame = None
-        # self.saved_commands = None
-        # self.briscola_img = None
-        # self.fixed_briscola_frame = None
-        # self.fixed_briscola = None
-        # self.deck_count = None
-        # self.agent_score = None
-        # self.player_score = None
-        # self.agent_counter = None
-        # self.player_counter = None
-        # self.log_text = None
-        # self.count_log_row = "1"
-        # self.log_frame = None
-        # self.restart_btn = None
-        # self.human_agent = None
-        # self.menu_frame = None
-        # self.briscola_name = None
-        # self.player_hand = []
-        # self.agent_hand = []
-        # self.content = ttk.Frame(self.root, padding=(50, 50, 50, 50), style="Green.TFrame")
-        # self.content.grid(column=0, row=0, sticky="NSEW")
-        #
-        # self.init_frames(gui_obj)
+        self.content.destroy()
 
-    def init_frames(self, gui_obj):
+    #
+    #     self.new_game_btn = None
+    #     self.deck_frame = None
+    #     self.table_frame = None
+    #     self.agent_frame = None
+    #     self.player_frame = None
+    #     self.agent_score_text = None
+    #     self.agent_score_frame = None
+    #     self.player_score_text = None
+    #     self.player_score_frame = None
+    #     self.saved_commands = None
+    #     self.briscola_img = None
+    #     self.fixed_briscola_frame = None
+    #     self.fixed_briscola = None
+    #     self.deck_count = None
+    #     self.agent_score = None
+    #     self.player_score = None
+    #     self.agent_counter = None
+    #     self.player_counter = None
+    #     self.log_text = None
+    #     self.count_log_row = "1"
+    #     self.log_frame = None
+    #     self.restart_btn = None
+    #     self.human_agent = None
+    #     self.menu_frame = None
+    #     self.briscola_name = None
+    #     self.player_hand = []
+    #     self.agent_hand = []
+    #     self.content = ttk.Frame(self.root, padding=(50, 50, 50, 50), style="Green.TFrame")
+    #     self.content.grid(column=0, row=0, sticky="NSEW")
+    #
+    #     self.init_frames(gui_obj, True)
+
+    def init_frames(self, gui_obj, restart=False):
         """
         This method populates the content with initial values, starts the gui for the Briscola game and starts the game.
         """
@@ -470,7 +491,7 @@ class BriscolaGui:
             pass
         self.create_main_frames()
         # self.populate_menu_frame(gui_obj)
-        self.start_game(gui_obj)
+        self.start_game(gui_obj, restart)
 
     def start_gui(self, gui_obj):
         """

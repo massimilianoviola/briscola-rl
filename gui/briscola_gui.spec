@@ -1,12 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import pathlib
 
 block_cipher = None
 
-
 a = Analysis(
     ['briscola_gui.py'],
-    pathex=['C:\\Users\\letto\\Desktop\\LocalRepository\\briscola-rl'],
+    pathex=[pathlib.Path().resolve().parent],
     binaries=[],
     datas=[],
     hiddenimports=[],

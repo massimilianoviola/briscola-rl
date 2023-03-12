@@ -348,8 +348,13 @@ class BriscolaGame:
             )
 
         winner_player_id, winner_points = self.get_winner()
+        if winner_player_id == 0:
+            self.gui_obj.insert_log(f"Human wins with {winner_points} points!!")
+            self.gui_obj.insert_winner("Human")
+        else:
+            self.gui_obj.insert_log(f"Agent wins with {winner_points} points!!")
+            self.gui_obj.insert_winner("Agent")
         self.logger.PVP(f"Player {winner_player_id} wins with {winner_points} points!!")
-
         return winner_player_id, winner_points
 
     def update_game(self, winner_player, points, gui_obj=None):
@@ -470,18 +475,18 @@ def play_episode(game, agents, gui_obj=None, train=True):
 
             game.play_step(action, player_id)
             if gui_obj is not None and player_id == 0:
-                gui_obj.notify_after(1000)
+                gui_obj.notify_after(500)
                 with gui_obj.cond:
                     gui_obj.cond.wait()
             if gui_obj is not None and player_id == 1:
                 if i == 0:
-                    gui_obj.notify_after(1000)
+                    gui_obj.notify_after(500)
                     with gui_obj.cond:
                         gui_obj.cond.wait()
                     gui_obj.agent_play_card(action)
                 else:
                     gui_obj.agent_play_card(action)
-                    gui_obj.notify_after(1000)
+                    gui_obj.notify_after(500)
                     with gui_obj.cond:
                         gui_obj.cond.wait()
 
