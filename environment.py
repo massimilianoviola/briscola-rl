@@ -463,6 +463,8 @@ def play_episode(game, agents, gui_obj=None, train=True):
             available_actions = game.get_player_actions(player_id)
             if agent.name == "HumanAgent":
                 action = agent.select_action(available_actions, gui_obj)
+                if action == -1:
+                    return
             else:
                 action = agent.select_action(available_actions)
 

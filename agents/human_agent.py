@@ -33,7 +33,7 @@ class HumanAgent:
         @param gui_obj: BriscolaGui object
         @param render: True is you want logs, False otherwise
 
-        @return the index of the chosen action
+        @return the index of the chosen action, -1 if the gui called a reset
         """
         if not render:
             print("Your turn!")
@@ -43,8 +43,14 @@ class HumanAgent:
             try:
                 if gui_obj is not None:
                     with gui_obj.cond:
+                        gui_obj.activate_restart_btn(gui_obj)
                         gui_obj.cond.wait()
-                    action = self.action
+                    if not gui_obj.reset:
+                        gui_obj.deactivate_restart_btn()
+                        action = self.action
+                    else:
+                        gui_obj.reset = False
+                        return -1
                 else:
                     action = int(input('Input: '))
             except ValueError:

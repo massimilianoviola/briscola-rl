@@ -30,6 +30,7 @@ class BriscolaGui:
     frame_padding = 5
     card_label_padding = 5
     cond = threading.Condition()
+    reset = False
     # {"12_Due_di_coppe.jpg": image_object, ...}
     card_images = {}
     image_size = (98, 162)
@@ -48,13 +49,9 @@ class BriscolaGui:
         self.player_score_frame = None
         self.saved_commands = None
         self.briscola_img = None
-        self.fixed_briscola_frame = None
-        self.fixed_briscola = None
         self.deck_count = None
         self.agent_score = None
         self.player_score = None
-        self.agent_counter = None
-        self.player_counter = None
         self.log_text = None
         self.count_log_row = "1"
         self.log_frame = None
@@ -139,12 +136,12 @@ class BriscolaGui:
         new_height = int(self.image_size[1] / 1.2)
         img = Image.open(img_path).resize((new_width, new_height), resample=Resampling.LANCZOS)
         self.briscola_img = (ImageTk.PhotoImage(image=img))
-        self.fixed_briscola_frame = ttk.Frame(self.content, style="Green.TFrame", height=300)
-        self.fixed_briscola_frame.grid(column=3, row=2)
-        self.fixed_briscola = ttk.Label(self.fixed_briscola_frame, style="Card.TButton",
+        fixed_briscola_frame = ttk.Frame(self.content, style="Green.TFrame", height=300)
+        fixed_briscola_frame.grid(column=3, row=2)
+        fixed_briscola = ttk.Label(fixed_briscola_frame, style="Card.TButton",
                                         image=self.briscola_img)
-        self.fixed_briscola.grid(column=0, row=1)
-        briscola_text = ttk.Label(self.fixed_briscola_frame, text="Briscola", style="Counter.TLabel")
+        fixed_briscola.grid(column=0, row=1)
+        briscola_text = ttk.Label(fixed_briscola_frame, text="Briscola", style="Counter.TLabel")
         briscola_text.grid(column=0, row=0, pady=1)
 
     def player_play_card(self, index):
@@ -238,13 +235,15 @@ class BriscolaGui:
             child["command"] = 0
         self.root.after(ms, self.release)
 
-    def start_game(self, gui_obj, restart=False):
+    def activate_restart_btn(self, gui_obj):
+        partial_func = partial(self.reset_game, gui_obj)
+        self.restart_btn["command"] = partial_func
+
+    def deactivate_restart_btn(self):
+        self.restart_btn["command"] = 0
+
+    def start_game(self, gui_obj):
         """Play against one of the intelligent agents."""
-        if restart:
-            try:
-                self.game.end_game()
-            except ValueError:
-                pass
         parser = argparse.ArgumentParser()
 
         parser.add_argument("--model_dir", default=None,
@@ -256,8 +255,7 @@ class BriscolaGui:
 
         # initialize the environment
         logger = BriscolaLogger(BriscolaLogger.LoggerLevels.PVP)
-        if not restart:
-            self.game = brisc.BriscolaGame(2, logger, gui_obj)
+        self.game = brisc.BriscolaGame(2, logger, gui_obj)
         self.game.reset()
 
         # initialize the agents
@@ -287,18 +285,15 @@ class BriscolaGui:
         self.update_agent_score(0)
         self.update_deck_count(33)
         self.insert_log("Game started...")
-        self.player_score_text["text"] = "Human score"
-        self.agent_score_text["text"] = "Agent score"
 
         self.game_thread = threading.Thread(target=brisc.play_episode, args=(self.game, agents, gui_obj, False))
         self.game_thread.start()
 
-    def populate_menu_frame(self, gui_obj):
+    def populate_menu_frame(self):
         """
         Inserts the restart game button into "menu_frame"
         """
-        partial_func = partial(self.reset_gui, gui_obj)
-        self.restart_btn = ttk.Button(self.menu_frame, text="Restart", command=partial_func, style="Restart.TButton")
+        self.restart_btn = ttk.Button(self.menu_frame, text="Restart", command=0, style="Restart.TButton")
         self.restart_btn.grid(column=0, row=0, sticky="NS")
 
     def populate_deck_frame(self, briscola_name):
@@ -434,6 +429,9 @@ class BriscolaGui:
         self.agent_score_text.grid(column=0, row=0)
         self.agent_score.grid(column=0, row=1)
 
+        self.player_score_text["text"] = "Human score"
+        self.agent_score_text["text"] = "Agent score"
+
         self.deck_count = ttk.Label(self.deck_frame, style="Counter.TLabel")
         self.deck_count.grid(column=1, row=1)
 
@@ -442,46 +440,60 @@ class BriscolaGui:
         self.content.columnconfigure(2, weight=0)
         self.content.columnconfigure(3, weight=0)
 
-    def reset_gui(self, gui_obj):
+    def reset_game(self, gui_obj):
         """
-        Clears all frames, resets the running game and starts a new game calling the function "start_game"
+        Resets the game and the gui.
         """
+        self.reset = True
+        with self.cond:
+            self.cond.notify()
+        self.player_hand = []
+        self.agent_hand = []
         self.content.destroy()
+        self.content = ttk.Frame(self.root, padding=(50, 50, 50, 50), style="Green.TFrame")
+        self.content.grid(column=0, row=0, sticky="NSEW")
+        self.create_main_frames()
+        self.populate_menu_frame()
+        parser = argparse.ArgumentParser()
 
-    #
-    #     self.new_game_btn = None
-    #     self.deck_frame = None
-    #     self.table_frame = None
-    #     self.agent_frame = None
-    #     self.player_frame = None
-    #     self.agent_score_text = None
-    #     self.agent_score_frame = None
-    #     self.player_score_text = None
-    #     self.player_score_frame = None
-    #     self.saved_commands = None
-    #     self.briscola_img = None
-    #     self.fixed_briscola_frame = None
-    #     self.fixed_briscola = None
-    #     self.deck_count = None
-    #     self.agent_score = None
-    #     self.player_score = None
-    #     self.agent_counter = None
-    #     self.player_counter = None
-    #     self.log_text = None
-    #     self.count_log_row = "1"
-    #     self.log_frame = None
-    #     self.restart_btn = None
-    #     self.human_agent = None
-    #     self.menu_frame = None
-    #     self.briscola_name = None
-    #     self.player_hand = []
-    #     self.agent_hand = []
-    #     self.content = ttk.Frame(self.root, padding=(50, 50, 50, 50), style="Green.TFrame")
-    #     self.content.grid(column=0, row=0, sticky="NSEW")
-    #
-    #     self.init_frames(gui_obj, True)
+        parser.add_argument("--model_dir", default=None,
+                            help="Provide a trained model path if you want to play against a deep agent", type=str)
+        parser.add_argument("--network", default=NetworkTypes.DRQN, choices=[NetworkTypes.DQN, NetworkTypes.DRQN],
+                            help="Neural network used for approximating value function")
 
-    def init_frames(self, gui_obj, restart=False):
+        flags = parser.parse_args()
+        # initialize the environment
+        logger = BriscolaLogger(BriscolaLogger.LoggerLevels.PVP)
+        self.game = brisc.BriscolaGame(2, logger, gui_obj)
+        self.game.reset()
+        # initialize the agents
+        self.human_agent = HumanAgent()
+        agents = [self.human_agent]
+        if flags.model_dir:
+            agent = QAgent(network=flags.network)
+            agent.load_model(flags.model_dir)
+            agent.make_greedy()
+            agents.append(agent)
+        else:
+            agent = AIAgent()
+            agents.append(agent)
+        # initializing the gui and starting the game
+        briscola = self.game.briscola.name.split()
+        # finding the image file of the briscola
+        for filename in self.card_images:
+            # e.g. briscola = ["Asso", "Di", "Bastoni"]
+            if briscola[0] in filename and briscola[2].lower() in filename:
+                self.populate_deck_frame(filename)
+                self.set_briscola(filename)
+                break
+        self.update_player_score(0)
+        self.update_agent_score(0)
+        self.update_deck_count(33)
+        self.insert_log("Game started...")
+        self.game_thread = threading.Thread(target=brisc.play_episode, args=(self.game, agents, gui_obj, False))
+        self.game_thread.start()
+
+    def init_frames(self, gui_obj):
         """
         This method populates the content with initial values, starts the gui for the Briscola game and starts the game.
         """
@@ -490,8 +502,8 @@ class BriscolaGui:
         except AttributeError:
             pass
         self.create_main_frames()
-        # self.populate_menu_frame(gui_obj)
-        self.start_game(gui_obj, restart)
+        self.populate_menu_frame()
+        self.start_game(gui_obj)
 
     def start_gui(self, gui_obj):
         """
