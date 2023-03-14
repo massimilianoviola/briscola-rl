@@ -43,10 +43,10 @@ class HumanAgent:
             try:
                 if gui_obj is not None:
                     with gui_obj.cond:
-                        gui_obj.activate_restart_btn(gui_obj)
+                        gui_obj.activate_restart(gui_obj)
                         gui_obj.cond.wait()
                     if not gui_obj.reset:
-                        gui_obj.deactivate_restart_btn()
+                        gui_obj.deactivate_restart()
                         action = self.action
                     else:
                         gui_obj.reset = False

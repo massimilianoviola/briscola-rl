@@ -476,19 +476,20 @@ def play_episode(game, agents, gui_obj=None, train=True):
             # print(f"{agent.name} plays {player.hand[action]} ({action})")
 
             game.play_step(action, player_id)
+            wait_time = 500  # in ms
             if gui_obj is not None and player_id == 0:
-                gui_obj.notify_after(500)
+                gui_obj.notify_after(wait_time)
                 with gui_obj.cond:
                     gui_obj.cond.wait()
             if gui_obj is not None and player_id == 1:
                 if i == 0:
-                    gui_obj.notify_after(500)
+                    gui_obj.notify_after(wait_time)
                     with gui_obj.cond:
                         gui_obj.cond.wait()
                     gui_obj.agent_play_card(action)
                 else:
                     gui_obj.agent_play_card(action)
-                    gui_obj.notify_after(500)
+                    gui_obj.notify_after(wait_time)
                     with gui_obj.cond:
                         gui_obj.cond.wait()
 
@@ -522,4 +523,7 @@ def play_episode(game, agents, gui_obj=None, train=True):
         if train and rewards:
             agent.update(rewards[i])
 
+    if gui_obj is not None:
+        gui_obj.activate_restart(gui_obj)
+        gui_obj.reset = False
     return *game.end_game(), rewards_log

@@ -1,12 +1,12 @@
 import argparse
 import os
-import pathlib
 import sys
 import threading
 from functools import partial
 from tkinter import *
 from tkinter import ttk, messagebox
 
+import _tkinter
 from PIL import ImageTk, Image
 from PIL.Image import Resampling
 
@@ -18,6 +18,9 @@ from utils import NetworkTypes, BriscolaLogger
 
 
 def resource_path(relative_path):
+    """
+    This function is necessary for gathering the card images paths when the executable is used.
+    """
     try:
         base_path = sys._MEIPASS
     except Exception:
@@ -34,31 +37,36 @@ class BriscolaGui:
     # {"12_Due_di_coppe.jpg": image_object, ...}
     card_images = {}
     image_size = (98, 162)
+    saved_commands = []
+    count_log_row = "1"
 
     def __init__(self):
-        self.game_thread = None
-        self.game = None
-        self.new_game_btn = None
         self.deck_frame = None
         self.table_frame = None
         self.agent_frame = None
         self.player_frame = None
-        self.agent_score_text = None
+        self.menu_frame = None
+        self.log_frame = None
         self.agent_score_frame = None
-        self.player_score_text = None
         self.player_score_frame = None
-        self.saved_commands = None
+
+        self.logger = None
+        self.agent = None
+        self.human_agent = None
+        self.game_thread = None
+        self.briscola_game = None
+
+        self.new_game_btn = None
+        self.restart_btn = None
+        self.deck_count_label = None
+
         self.briscola_img = None
-        self.deck_count = None
+        self.briscola_name = None
+
         self.agent_score = None
         self.player_score = None
         self.log_text = None
-        self.count_log_row = "1"
-        self.log_frame = None
-        self.restart_btn = None
-        self.human_agent = None
-        self.menu_frame = None
-        self.briscola_name = None
+
         self.player_hand = []
         self.agent_hand = []
 
@@ -139,7 +147,7 @@ class BriscolaGui:
         fixed_briscola_frame = ttk.Frame(self.content, style="Green.TFrame", height=300)
         fixed_briscola_frame.grid(column=3, row=2)
         fixed_briscola = ttk.Label(fixed_briscola_frame, style="Card.TButton",
-                                        image=self.briscola_img)
+                                   image=self.briscola_img)
         fixed_briscola.grid(column=0, row=1)
         briscola_text = ttk.Label(fixed_briscola_frame, text="Briscola", style="Counter.TLabel")
         briscola_text.grid(column=0, row=0, pady=1)
@@ -180,13 +188,6 @@ class BriscolaGui:
         self.agent_hand.pop(index)
         self.agent_frame.winfo_children()[len(self.agent_hand)].destroy()
 
-    def empty_deck_frame(self):
-        """
-        This function loads the image "Deck_Finito.jpg" into the frame "deck_frame".
-        """
-        for child in self.deck_frame.winfo_children():
-            child.destroy()
-
     def agent_draw_card(self, card_name):
         """
         This function adds a card to the agent hand.
@@ -204,6 +205,7 @@ class BriscolaGui:
     def player_draw_card(self, card_name):
         """
         This function adds a card to the player hand at the right most place
+
         @param card_name: image filename of the card to be added
         """
         if card_name is None:
@@ -235,59 +237,12 @@ class BriscolaGui:
             child["command"] = 0
         self.root.after(ms, self.release)
 
-    def activate_restart_btn(self, gui_obj):
+    def activate_restart(self, gui_obj):
         partial_func = partial(self.reset_game, gui_obj)
         self.restart_btn["command"] = partial_func
 
-    def deactivate_restart_btn(self):
+    def deactivate_restart(self):
         self.restart_btn["command"] = 0
-
-    def start_game(self, gui_obj):
-        """Play against one of the intelligent agents."""
-        parser = argparse.ArgumentParser()
-
-        parser.add_argument("--model_dir", default=None,
-                            help="Provide a trained model path if you want to play against a deep agent", type=str)
-        parser.add_argument("--network", default=NetworkTypes.DRQN, choices=[NetworkTypes.DQN, NetworkTypes.DRQN],
-                            help="Neural network used for approximating value function")
-
-        flags = parser.parse_args()
-
-        # initialize the environment
-        logger = BriscolaLogger(BriscolaLogger.LoggerLevels.PVP)
-        self.game = brisc.BriscolaGame(2, logger, gui_obj)
-        self.game.reset()
-
-        # initialize the agents
-        self.human_agent = HumanAgent()
-        agents = [self.human_agent]
-
-        if flags.model_dir:
-            agent = QAgent(network=flags.network)
-            agent.load_model(flags.model_dir)
-            agent.make_greedy()
-            agents.append(agent)
-        else:
-            agent = AIAgent()
-            agents.append(agent)
-
-        # initializing the gui and starting the game
-        briscola = self.game.briscola.name.split()
-        # finding the image file of the briscola
-        for filename in self.card_images:
-            # e.g. briscola = ["Asso", "Di", "Bastoni"]
-            if briscola[0] in filename and briscola[2].lower() in filename:
-                self.populate_deck_frame(filename)
-                self.set_briscola(filename)
-                break
-
-        self.update_player_score(0)
-        self.update_agent_score(0)
-        self.update_deck_count(33)
-        self.insert_log("Game started...")
-
-        self.game_thread = threading.Thread(target=brisc.play_episode, args=(self.game, agents, gui_obj, False))
-        self.game_thread.start()
 
     def populate_menu_frame(self):
         """
@@ -323,6 +278,13 @@ class BriscolaGui:
             self.table_frame.winfo_children()[1].winfo_children()[0].destroy()
         except IndexError:
             pass
+
+    def empty_deck_frame(self):
+        """
+        This function loads the image "Deck_Finito.jpg" into the frame "deck_frame".
+        """
+        for child in self.deck_frame.winfo_children():
+            child.destroy()
 
     def insert_log(self, text):
         """
@@ -364,7 +326,12 @@ class BriscolaGui:
 
         @param count: int that represents the new score of the agent
         """
-        self.deck_count["text"] = str(count)
+        try:
+            self.deck_count_label["text"] = str(count)
+        except _tkinter.TclError:
+            self.deck_count_label = ttk.Label(self.deck_frame, text="", style="Counter.TLabel")
+            self.deck_count_label.grid(column=1, row=1)
+            self.deck_count_label["text"] = str(count)
 
     def insert_winner(self, player_name):
         """
@@ -418,80 +385,26 @@ class BriscolaGui:
         self.player_score_frame = ttk.Frame(self.content, style="Green.TFrame")
         self.player_score = ttk.Label(self.player_score_frame, style="Counter.TLabel")
         self.player_score_frame.grid(column=2, row=2, sticky="W", padx=30)
-        self.player_score_text = ttk.Label(self.player_score_frame, style="CounterText.TLabel")
-        self.player_score_text.grid(column=0, row=0)
+        player_score_title = ttk.Label(self.player_score_frame, style="CounterText.TLabel")
+        player_score_title.grid(column=0, row=0)
+        player_score_title["text"] = "Human score"
         self.player_score.grid(column=0, row=1)
 
         self.agent_score_frame = ttk.Frame(self.content, style="Green.TFrame")
         self.agent_score = ttk.Label(self.agent_score_frame, style="Counter.TLabel")
         self.agent_score_frame.grid(column=2, row=0, sticky="W", padx=30)
-        self.agent_score_text = ttk.Label(self.agent_score_frame, style="CounterText.TLabel")
-        self.agent_score_text.grid(column=0, row=0)
+        agent_score_title = ttk.Label(self.agent_score_frame, style="CounterText.TLabel")
+        agent_score_title.grid(column=0, row=0)
+        agent_score_title["text"] = "Agent score"
         self.agent_score.grid(column=0, row=1)
 
-        self.player_score_text["text"] = "Human score"
-        self.agent_score_text["text"] = "Agent score"
-
-        self.deck_count = ttk.Label(self.deck_frame, style="Counter.TLabel")
-        self.deck_count.grid(column=1, row=1)
+        self.deck_count_label = ttk.Label(self.deck_frame, text="", style="Counter.TLabel")
+        self.deck_count_label.grid(column=1, row=1)
 
         self.content.columnconfigure(0, weight=0)
         self.content.columnconfigure(1, weight=1)
         self.content.columnconfigure(2, weight=0)
         self.content.columnconfigure(3, weight=0)
-
-    def reset_game(self, gui_obj):
-        """
-        Resets the game and the gui.
-        """
-        self.reset = True
-        with self.cond:
-            self.cond.notify()
-        self.player_hand = []
-        self.agent_hand = []
-        self.content.destroy()
-        self.content = ttk.Frame(self.root, padding=(50, 50, 50, 50), style="Green.TFrame")
-        self.content.grid(column=0, row=0, sticky="NSEW")
-        self.create_main_frames()
-        self.populate_menu_frame()
-        parser = argparse.ArgumentParser()
-
-        parser.add_argument("--model_dir", default=None,
-                            help="Provide a trained model path if you want to play against a deep agent", type=str)
-        parser.add_argument("--network", default=NetworkTypes.DRQN, choices=[NetworkTypes.DQN, NetworkTypes.DRQN],
-                            help="Neural network used for approximating value function")
-
-        flags = parser.parse_args()
-        # initialize the environment
-        logger = BriscolaLogger(BriscolaLogger.LoggerLevels.PVP)
-        self.game = brisc.BriscolaGame(2, logger, gui_obj)
-        self.game.reset()
-        # initialize the agents
-        self.human_agent = HumanAgent()
-        agents = [self.human_agent]
-        if flags.model_dir:
-            agent = QAgent(network=flags.network)
-            agent.load_model(flags.model_dir)
-            agent.make_greedy()
-            agents.append(agent)
-        else:
-            agent = AIAgent()
-            agents.append(agent)
-        # initializing the gui and starting the game
-        briscola = self.game.briscola.name.split()
-        # finding the image file of the briscola
-        for filename in self.card_images:
-            # e.g. briscola = ["Asso", "Di", "Bastoni"]
-            if briscola[0] in filename and briscola[2].lower() in filename:
-                self.populate_deck_frame(filename)
-                self.set_briscola(filename)
-                break
-        self.update_player_score(0)
-        self.update_agent_score(0)
-        self.update_deck_count(33)
-        self.insert_log("Game started...")
-        self.game_thread = threading.Thread(target=brisc.play_episode, args=(self.game, agents, gui_obj, False))
-        self.game_thread.start()
 
     def init_frames(self, gui_obj):
         """
@@ -501,6 +414,53 @@ class BriscolaGui:
             self.new_game_btn.destroy()
         except AttributeError:
             pass
+        self.create_main_frames()
+        self.populate_menu_frame()
+        self.start_game(gui_obj)
+
+    def start_game(self, gui_obj):
+        """Play against one of the intelligent agents."""
+        # initialize the environment
+        self.briscola_game = brisc.BriscolaGame(2, self.logger, gui_obj)
+        self.briscola_game.reset()
+
+        # initialize the agents
+        self.human_agent = HumanAgent()
+        agents = [self.human_agent, self.agent]
+
+        # initializing the gui and starting the game
+        briscola = self.briscola_game.briscola.name.split()
+        # finding the image file of the briscola
+        for filename in self.card_images:
+            # e.g. briscola = ["Asso", "Di", "Bastoni"]
+            if briscola[0] in filename and briscola[2].lower() in filename:
+                self.populate_deck_frame(filename)
+                self.set_briscola(filename)
+                break
+
+        self.update_player_score(0)
+        self.update_agent_score(0)
+        self.update_deck_count(33)
+        self.insert_log("Game started...")
+
+        self.game_thread = threading.Thread(target=brisc.play_episode,
+                                            args=(self.briscola_game, agents, gui_obj, False))
+        self.game_thread.start()
+
+    def reset_game(self, gui_obj):
+        """
+        Resets the game and the gui.
+        """
+        if self.agent_hand and self.player_hand:
+            # this means that the game is not finished yet, and it's the user turn
+            self.reset = True
+            with self.cond:
+                self.cond.notify()
+        self.player_hand = []
+        self.agent_hand = []
+        self.content.destroy()
+        self.content = ttk.Frame(self.root, padding=(50, 50, 50, 50), style="Green.TFrame")
+        self.content.grid(column=0, row=0, sticky="NSEW")
         self.create_main_frames()
         self.populate_menu_frame()
         self.start_game(gui_obj)
@@ -518,5 +478,25 @@ class BriscolaGui:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_dir", default=None,
+                        help="Provide a trained model path if you want to play against a deep agent", type=str)
+    parser.add_argument("--network", default=NetworkTypes.DRQN, choices=[NetworkTypes.DQN, NetworkTypes.DRQN],
+                        help="Neural network used for approximating value function")
+    flags = parser.parse_args()
+
     briscola_gui = BriscolaGui()
+
+    if flags.model_dir:
+        agent = QAgent(network=flags.network)
+        agent.load_model(flags.model_dir)
+        agent.make_greedy()
+        briscola_gui.agent = agent
+    else:
+        agent = AIAgent()
+        briscola_gui.agent = agent
+
+    logger = BriscolaLogger(BriscolaLogger.LoggerLevels.PVP)
+    briscola_gui.logger = logger
+
     briscola_gui.start_gui(briscola_gui)
