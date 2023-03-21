@@ -69,6 +69,8 @@ class BriscolaGui:
 
         self.player_hand = []
         self.agent_hand = []
+        self.player_played_card = None
+        self.agent_played_card = None
 
         # defining root and content
         self.root = Tk()
@@ -152,22 +154,49 @@ class BriscolaGui:
         briscola_text = ttk.Label(fixed_briscola_frame, text="Briscola", style="Counter.TLabel")
         briscola_text.grid(column=0, row=0, pady=1)
 
+    def hand_to_table(self, player_type, height):
+        """
+        Moves smoothly a card from the hand of the agent or the player (depending on the parameter) to the table.
+
+        @param player_type: (str) can be "human" or "agent".
+        @param height: (int) starting height of the card wrt to the content
+        """
+        if player_type != "human" and player_type != "agent":
+            raise ValueError
+        if player_type == "human":
+            if height > 300:
+                self.player_played_card.place(x=375, y=height, anchor="center")
+                height -= 3
+                self.root.after(1, lambda: self.hand_to_table(player_type, height))
+        if player_type == "agent":
+            if height <= 300:
+                self.agent_played_card.place(x=250, y=height, anchor="center")
+                height += 3
+                self.root.after(1, lambda: self.hand_to_table(player_type, height))
+
     def player_play_card(self, index):
         """
-        This function moves the chosen card from the "player_frame" to the "table_frame".
+        Moves the chosen card from "player_frame" to "table_frame".
 
-        @param index: index of the played card (can be [0, 2])
+        @param index: (int) index of the played card.
+            If the player has 3 cards in his hand, index can be [0, 2] where 0 is the left-most card.
         """
-        new_card = ttk.Label(self.table_frame.winfo_children()[1], style="Card.TButton",
-                             image=self.card_images[self.player_hand[index]])
-        new_card.grid(column=0, row=0, sticky="NSEW", padx=5, pady=5)
+        # creating a new card object to be put into the table
+        self.player_played_card = ttk.Label(self.content, style="Card.TButton",
+                                            image=self.card_images[self.player_hand[index]])
 
+        # removing the played card from the player hand and updating the commands with the new indexes
         self.player_hand.pop(index)
         self.player_frame.winfo_children()[index].destroy()
         for i in range(index, len(self.player_frame.winfo_children())):
             partial_func = partial(self.player_play_card, i)
             self.player_frame.winfo_children()[i]["command"] = partial_func
             self.player_frame.winfo_children()[i].grid(column=i, row=0)
+
+        # moving smoothly the card from the hand to the table
+        height = 400
+        self.player_played_card.place(x=375, y=height, anchor="center")
+        self.hand_to_table("human", height)
 
         # notify the game that a card has being played
         with self.cond:
@@ -180,13 +209,18 @@ class BriscolaGui:
 
         @param index: index of the played card (can be [0, 2])
         """
-        # creating and showing a label that represents the agent played card into the table frame
-        card = ttk.Label(self.table_frame.winfo_children()[0], style="Card.TButton",
-                         image=self.card_images[self.agent_hand[index]])
-        card.grid(column=0, row=0, sticky="NSEW", padx=5, pady=5)
-        # updating the agent hand
+        # creating a new card object to be put into the table
+        self.agent_played_card = ttk.Label(self.content, style="Card.TButton",
+                                           image=self.card_images[self.agent_hand[index]])
+
+        # removing the played card from the agent hand
         self.agent_hand.pop(index)
         self.agent_frame.winfo_children()[len(self.agent_hand)].destroy()
+
+        # moving smoothly the card from the hand to the table
+        height = 150
+        self.agent_played_card.place(x=250, y=height, anchor="center")
+        self.hand_to_table("agent", height)
 
     def agent_draw_card(self, card_name):
         """
@@ -261,23 +295,27 @@ class BriscolaGui:
         deck_label = ttk.Label(self.deck_frame, style="Retro.TLabel",
                                image=self.card_images["Carte_Napoletane_retro.jpg"])
 
-        # briscola_label.grid(column=0, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding)
         empty_label.grid(column=0, row=0)
         deck_label.grid(column=1, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding + 10)
 
-    def empty_table_frame(self):
+    def empty_table_frame(self, winner="human"):
         """
-        Removes all objects from the table frame
+        Removes all the cards from the table frame.
+
+        @param winner: (str) can be "human" or "agent"
         """
-        # time.sleep(1)
-        try:
-            self.table_frame.winfo_children()[0].winfo_children()[0].destroy()
-        except IndexError:
-            pass
-        try:
-            self.table_frame.winfo_children()[1].winfo_children()[0].destroy()
-        except IndexError:
-            pass
+        if winner == "human":
+            x_player = int(self.player_played_card.place_info()['x'])
+            y_player = int(self.player_played_card.place_info()['y'])
+            x_agent = int(self.agent_played_card.place_info()['x'])
+            y_agent = int(self.agent_played_card.place_info()['y'])
+            self.player_played_card.place(x=x_player + 10, y=y_player + 20, anchor="center")
+            self.agent_played_card.place(x=x_agent + 10, y=y_agent + 20, anchor="center")
+            if y_player > 800:
+                self.player_played_card.destroy()
+                self.agent_played_card.destroy()
+                return
+        self.root.after(1, self.empty_table_frame())
 
     def empty_deck_frame(self):
         """
@@ -306,29 +344,25 @@ class BriscolaGui:
 
     def update_player_score(self, score):
         """
-        Updates the score counter of the player
-
-        @param score: int that represents the new score of the player
+        @param score: (int) score of the player.
         """
         self.player_score["text"] = str(score)
 
     def update_agent_score(self, score):
         """
-        Updates the score counter of the agent
-
-        @param score: int that represents the new score of the agent
+        @param score: (int) score of the agent.
         """
         self.agent_score["text"] = str(score)
 
     def update_deck_count(self, count):
         """
-        Updates the number of cards inside the deck
-
-        @param count: int that represents the new score of the agent
+        @param count: (int) number of cards in the deck.
         """
         try:
             self.deck_count_label["text"] = str(count)
         except _tkinter.TclError:
+            # this is necessary because if the user repeatedly presses the restart button quickly
+            # it may happen that "deck_count_label" is not created in time
             self.deck_count_label = ttk.Label(self.deck_frame, text="", style="Counter.TLabel")
             self.deck_count_label.grid(column=1, row=1)
             self.deck_count_label["text"] = str(count)
@@ -336,6 +370,8 @@ class BriscolaGui:
     def insert_winner(self, player_name):
         """
         Shows the winner in the table frame through a label.
+
+        @param player_name: (str) the name of the winner.
         """
         for child in self.table_frame.winfo_children():
             child.destroy()
@@ -344,7 +380,7 @@ class BriscolaGui:
 
     def create_main_frames(self):
         """
-        Creates the 4 main frames.
+        Creates main frames, counters and the log.
         """
         self.content.columnconfigure(1, weight=1)
         self.content.rowconfigure(0, weight=1)
@@ -354,7 +390,7 @@ class BriscolaGui:
         self.menu_frame = ttk.Frame(self.content, style="Green.TFrame")
         self.agent_frame = ttk.Frame(self.content, style="Green.TFrame")
         self.player_frame = ttk.Frame(self.content, style="Green.TFrame")
-        self.table_frame = ttk.Frame(self.content, style="Green.TFrame", relief="sunken")
+        self.table_frame = ttk.Frame(self.content, style="Green.TFrame")
         self.deck_frame = ttk.Frame(self.content, style="Green.TFrame")
         self.log_frame = ttk.Frame(self.content, style="Green.TFrame")
 
@@ -365,12 +401,7 @@ class BriscolaGui:
         self.deck_frame.grid(column=3, row=1)
         self.log_frame.grid(column=3, row=0)
 
-        # inserting nested frames
-        agent_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame", width=120, height=180)
-        player_played_card_frame = ttk.Frame(self.table_frame, style="Green.TFrame", width=120, height=180)
-        agent_played_card_frame.grid(column=0, row=0, sticky="NSW", padx=self.frame_padding, pady=self.frame_padding)
-        player_played_card_frame.grid(column=1, row=0, sticky="NSE", padx=self.frame_padding, pady=self.frame_padding)
-
+        # log
         self.log_text = Text(self.log_frame, background="green", foreground="white", width=35, height=10,
                              padx=self.frame_padding, pady=self.frame_padding, state="disabled")
         self.log_text.grid(column=0, row=0, sticky="EW")
@@ -419,7 +450,9 @@ class BriscolaGui:
         self.start_game(gui_obj)
 
     def start_game(self, gui_obj):
-        """Play against one of the intelligent agents."""
+        """
+        Initializes a new game.
+        """
         # initialize the environment
         self.briscola_game = brisc.BriscolaGame(2, self.logger, gui_obj)
         self.briscola_game.reset()
