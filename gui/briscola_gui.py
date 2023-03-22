@@ -112,6 +112,9 @@ class BriscolaGui:
     def on_closing(self):
         if messagebox.askokcancel("Quit", "Do you want to quit?"):
             self.root.destroy()
+            self.reset = True
+            with self.cond:
+                self.cond.notify()
 
     @classmethod
     def find_card_name(cls, card, card_images):
