@@ -1,3 +1,7 @@
+"""
+@author: Alberto Ursino: albertoursino98@gmail.com
+"""
+
 import argparse
 import os
 import sys
