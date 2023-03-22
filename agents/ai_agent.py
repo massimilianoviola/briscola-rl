@@ -2,8 +2,6 @@ import sys
 import os
 import environment as brisc
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 
 class AIAgent:
     """Agent playing using predefined heuristics."""
