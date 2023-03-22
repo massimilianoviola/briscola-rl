@@ -1,6 +1,8 @@
 import random
 import time
 
+import _tkinter
+
 from utils import BriscolaLogger
 
 
@@ -285,15 +287,15 @@ class BriscolaGame:
                     reward += extra_points
                     self.won_the_match_points = True
                     if count == 0:
-                        return [reward, -reward]
+                        return [reward, -reward], winner_player_id
                     else:
-                        return [-reward, reward]
+                        return [-reward, reward], winner_player_id
 
             count += 1
             rewards.append(reward)
 
         # print(rewards)
-        return rewards
+        return rewards, winner_player_id
 
     def evaluate_step(self):
         """Look at the cards played and decide which player won the hand."""
@@ -301,6 +303,7 @@ class BriscolaGame:
             self.briscola.seed, self.played_cards
         )
         winner_player_id = self.players_order[ordered_winner_id]
+        print("actual winner", winner_player_id)
 
         points = sum([card.points for card in self.played_cards])
         winner_player = self.players[winner_player_id]
@@ -432,8 +435,11 @@ def play_episode(game, agents, gui_obj=None, train=True):
     """
 
     players_order = None
+
+    # GUI: game.reset() is called from the GUI, that's why we avoid recalling it here
     if gui_obj is None:
         game.reset()
+
     rewards_log = {agent.name: [] for agent in agents}
     rewards = []
 
@@ -463,6 +469,7 @@ def play_episode(game, agents, gui_obj=None, train=True):
             available_actions = game.get_player_actions(player_id)
             if agent.name == "HumanAgent":
                 action = agent.select_action(available_actions, gui_obj)
+                # GUI: if the user presses "restart" the function "play_episode" returns and a new thread can be created
                 if action == -1:
                     return
             else:
@@ -476,6 +483,8 @@ def play_episode(game, agents, gui_obj=None, train=True):
             # print(f"{agent.name} plays {player.hand[action]} ({action})")
 
             game.play_step(action, player_id)
+
+            # GUI: waiting some time before the agent plays a card (just to simulate some thinking)
             wait_time = 500  # in ms
             if gui_obj is not None and player_id == 0:
                 gui_obj.notify_after(wait_time)
@@ -506,14 +515,19 @@ def play_episode(game, agents, gui_obj=None, train=True):
         # print(card)
 
         # update the environment
-        rewards = game.get_rewards_from_step()
+        reward, winner_id = game.get_rewards_from_step()
 
         # for i, player_id in enumerate(game.get_players_order()):
         # print(f"{agents[player_id].name} gets reward {rewards[i]}")
 
-        game.draw_step(gui_obj)
+        # GUI: removing the two played cards from the table
         if gui_obj is not None:
-            gui_obj.empty_table_frame()
+            gui_obj.notify_after(700)
+            gui_obj.empty_table_frame(winner_id)
+            with gui_obj.cond:
+                gui_obj.cond.wait()
+
+        game.draw_step(gui_obj)
 
     # update for the terminal state
     for i, player_id in enumerate(players_order):

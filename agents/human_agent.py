@@ -19,7 +19,7 @@ class HumanAgent:
 
     def played_card(self, action):
         """
-        Method called by the gui for specifying the played card
+        Method called from the GUI necessary for specifying the played card
 
         @param action: index [0, 2] that is the played card
         """
@@ -30,7 +30,7 @@ class HumanAgent:
         If it's not a valid action index, do something random.
 
         @param actions: list of available actions
-        @param gui_obj: BriscolaGui object
+        @param gui_obj: BriscolaGui object for controlling the GUI
         @param render: True is you want logs, False otherwise
 
         @return the index of the chosen action, -1 if the gui called a reset
@@ -39,8 +39,8 @@ class HumanAgent:
             print("Your turn!")
             print(f"The briscola is {self.briscola.name}.")
             print(f"Your hand is: {[card.name for card in self.hand]}.")
-
             try:
+                # GUI: waiting for the user to select a card from the GUI
                 if gui_obj is not None:
                     with gui_obj.cond:
                         gui_obj.activate_restart(gui_obj)

@@ -257,18 +257,24 @@ class BriscolaGui:
         if card_name == self.briscola_name:
             self.empty_deck_frame()
 
-    def release(self):
-        with self.cond:
-            self.cond.notify()
+    def enable_player_hand(self):
         for i in range(0, len(self.player_frame.winfo_children())):
             self.player_frame.winfo_children()[i]["command"] = self.saved_commands[i]
         self.saved_commands = []
 
-    def notify_after(self, ms):
+    def disable_player_hand(self):
         self.saved_commands = []
         for child in self.player_frame.winfo_children():
             self.saved_commands.append(child["command"])
             child["command"] = 0
+
+    def release(self):
+        with self.cond:
+            self.cond.notify()
+        self.enable_player_hand()
+
+    def notify_after(self, ms):
+        self.disable_player_hand()
         self.root.after(ms, self.release)
 
     def activate_restart(self, gui_obj):
@@ -298,24 +304,31 @@ class BriscolaGui:
         empty_label.grid(column=0, row=0)
         deck_label.grid(column=1, row=0, sticky="NS", padx=self.card_label_padding, pady=self.card_label_padding + 10)
 
-    def empty_table_frame(self, winner="human"):
+    def empty_table_frame(self, winner):
         """
         Removes all the cards from the table frame.
 
         @param winner: (str) can be "human" or "agent"
         """
-        if winner == "human":
-            x_player = int(self.player_played_card.place_info()['x'])
-            y_player = int(self.player_played_card.place_info()['y'])
-            x_agent = int(self.agent_played_card.place_info()['x'])
-            y_agent = int(self.agent_played_card.place_info()['y'])
-            self.player_played_card.place(x=x_player + 10, y=y_player + 20, anchor="center")
-            self.agent_played_card.place(x=x_agent + 10, y=y_agent + 20, anchor="center")
+        x_player = int(self.player_played_card.place_info()['x'])
+        y_player = int(self.player_played_card.place_info()['y'])
+        x_agent = int(self.agent_played_card.place_info()['x'])
+        y_agent = int(self.agent_played_card.place_info()['y'])
+        if winner == 0:
+            self.player_played_card.place(x=x_player + 10, y=y_player + 30, anchor="center")
+            self.agent_played_card.place(x=x_agent + 10, y=y_agent + 30, anchor="center")
             if y_player > 800:
                 self.player_played_card.destroy()
                 self.agent_played_card.destroy()
                 return
-        self.root.after(1, self.empty_table_frame())
+        if winner == 1:
+            self.player_played_card.place(x=x_player + 10, y=y_player - 30, anchor="center")
+            self.agent_played_card.place(x=x_agent + 10, y=y_agent - 30, anchor="center")
+            if y_player < -150:
+                self.player_played_card.destroy()
+                self.agent_played_card.destroy()
+                return
+        return self.root.after(1, self.empty_table_frame(winner))
 
     def empty_deck_frame(self):
         """
