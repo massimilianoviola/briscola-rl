@@ -1,6 +1,5 @@
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import environment as brisc
 
 
@@ -8,6 +7,10 @@ class AIAgent:
     """Agent playing using predefined heuristics."""
 
     def __init__(self):
+        self.played_cards = None
+        self.briscola_seed = None
+        self.points = None
+        self.hand = None
         self.name = 'AIAgent'
 
     def observe(self, game, player):
@@ -18,10 +21,13 @@ class AIAgent:
         self.briscola_seed = game.briscola.seed
 
     def select_action(self, actions):
-        """Default set of rules that the agent follows to play."""
+        """Default set of rules that the agent follows to play.
+
+        @return the index of the chosen action
+        """
 
         # count how many points are present on the table
-        points_on_table =  0
+        points_on_table = 0
         for played_card in self.played_cards:
             points_on_table += played_card.points
 
@@ -36,7 +42,7 @@ class AIAgent:
                     if winner:
                         win_actions.append(action_index)
                         points.append(card.points)
-            
+
             # the agent can win this hand
             if win_actions:
                 # cards that can win the hand, sorted according to the points that can be earned by playing them

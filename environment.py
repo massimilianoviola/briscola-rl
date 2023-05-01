@@ -1,4 +1,8 @@
 import random
+import time
+
+import _tkinter
+
 from utils import BriscolaLogger
 
 
@@ -21,6 +25,10 @@ class BriscolaDeck:
     """Initialize a deck of Briscola cards with its attributes."""
 
     def __init__(self):
+        self.current_deck = None
+        self.end_deck = None
+        self.briscola = None
+        self.deck = None
         self.create_decklist()
         self.reset()
 
@@ -28,7 +36,7 @@ class BriscolaDeck:
         """Create all the BriscolaCards and add them to the deck."""
         points = [11, 0, 10, 0, 0, 0, 0, 2, 3, 4]
         strengths = [9, 0, 8, 1, 2, 3, 4, 5, 6, 7]
-        seeds = ["Bastoni", "Coppe", "Denari", "Spade"]
+        seeds = ["Denari", "Coppe", "Spade", "Bastoni"]
         names = [
             "Asso",
             "Due",
@@ -75,10 +83,12 @@ class BriscolaDeck:
             )
         self.briscola = briscola
 
-    def draw_card(self):
+    def draw_card(self, gui_obj=None):
         """If the deck is not empty, draw a card, otherwise return the briscola or nothing."""
         if self.current_deck:
             drawn_card = self.current_deck.pop()
+            if gui_obj is not None:
+                gui_obj.update_deck_count(len(self.current_deck))
         else:
             drawn_card = self.briscola
             self.briscola = None
@@ -109,6 +119,8 @@ class BriscolaPlayer:
     """Create basic player actions."""
 
     def __init__(self, _id):
+        self.points = None
+        self.hand = None
         self.id = _id
         self.reset()
 
@@ -117,9 +129,15 @@ class BriscolaPlayer:
         self.hand = []
         self.points = 0
 
-    def draw(self, deck):
+    def draw(self, deck, gui_obj):
         """Try to draw a card from the deck."""
-        new_card = deck.draw_card()
+        new_card = deck.draw_card(gui_obj)
+        if gui_obj is not None:
+            filename = gui_obj.find_card_name(new_card, gui_obj.card_images)
+            if self.id == 0:
+                gui_obj.player_draw_card(filename)
+            elif self.id == 1:
+                gui_obj.agent_draw_card(filename)
         if new_card is not None:
             self.hand.append(new_card)
         if len(self.hand) > 3:
@@ -127,26 +145,39 @@ class BriscolaPlayer:
                 "Calling BriscolaPlayer.draw caused the player to have more than 3 cards in hand!"
             )
 
+    def get_hand(self):
+        """
+        Return the player hand, that is an array containing 3 card objects
+        """
+        return self.hand
+
     def play_card(self, hand_index):
         """Try to play a card from the hand and return the chosen card or an exception if invalid index."""
         try:
             card = self.hand[hand_index]
             del self.hand[hand_index]
             return card
-        except:
+        except Exception as e:
             raise ValueError("BriscolaPlayer.play_card called with invalid hand_index!")
 
 
 class BriscolaGame:
     """Create the game environment with all the game stages."""
 
-    def __init__(self, num_players=2, logger=BriscolaLogger()):
+    def __init__(self, num_players=2, logger=BriscolaLogger(), gui_obj=None):
+        self.briscola = None
+        self.players_order = None
+        self.turn_player = None
+        self.players = None
+        self.played_cards = None
+        self.history = None
         self.num_players = num_players
         self.deck = BriscolaDeck()
         self.logger = logger
         self.won_the_match_points = False
         self.counter = 1
         self.screen = None
+        self.gui_obj = gui_obj
 
     def reset(self):
         """Start a new game."""
@@ -161,13 +192,13 @@ class BriscolaGame:
         self.players_order = self.get_players_order()
 
         # initialize the briscola
-        self.briscola = self.deck.draw_card()
+        self.briscola = self.deck.draw_card(self.gui_obj)
         self.deck.place_briscola(self.briscola)
 
         # initialize players' hands
         for _ in range(0, 3):
             for i in self.players_order:
-                self.players[i].draw(self.deck)
+                self.players[i].draw(self.deck, self.gui_obj)
 
         self.won_the_match_points = False
         self.counter = 1
@@ -182,10 +213,10 @@ class BriscolaGame:
         for passnum in range(len(player.hand) - 1, 0, -1):
             for i in range(passnum):
                 if scoring(
-                    self.briscola.seed,
-                    player.hand[i],
-                    player.hand[i + 1],
-                    keep_order=False,
+                        self.briscola.seed,
+                        player.hand[i],
+                        player.hand[i + 1],
+                        keep_order=False,
                 ):
                     temp = player.hand[i]
                     player.hand[i] = player.hand[i + 1]
@@ -204,7 +235,7 @@ class BriscolaGame:
         ]
         return players_order
 
-    def draw_step(self):
+    def draw_step(self, gui_obj):
         """Each player, in order, tries to draw a card from the deck."""
         self.logger.PVP(f"\n----------- NEW TURN -----------[{self.counter}]")
         # clear the table for the play_step
@@ -212,7 +243,7 @@ class BriscolaGame:
         # draw the cards in order
         for player_id in self.players_order:
             player = self.players[player_id]
-            player.draw(self.deck)
+            player.draw(self.deck, gui_obj)
 
     def play_step(self, action, player_id):
         """A player executes a chosen action."""
@@ -224,6 +255,11 @@ class BriscolaGame:
         self.logger.DEBUG(f"Player {player_id} chose action {action}.")
 
         card = player.play_card(action)
+        if self.gui_obj is not None:
+            if player_id == 0:
+                self.gui_obj.insert_log(f"Human played {card.name}.")
+            else:
+                self.gui_obj.insert_log(f"Agent played {card.name}.")
         self.logger.PVP(f"Player {player_id} played {card.name}.")
 
         self.played_cards.append(card)
@@ -245,21 +281,21 @@ class BriscolaGame:
             # Reward for winning the match
 
             player = self.players[player_id]
-            if self.won_the_match_points == False:
+            if not self.won_the_match_points:
                 if player.points >= 60 and reward > 0:
                     # print(f"PLAYER POINTS {player.points}")
                     reward += extra_points
                     self.won_the_match_points = True
                     if count == 0:
-                        return [reward, -reward]
+                        return [reward, -reward], winner_player_id
                     else:
-                        return [-reward, reward]
+                        return [-reward, reward], winner_player_id
 
             count += 1
             rewards.append(reward)
 
         # print(rewards)
-        return rewards
+        return rewards, winner_player_id
 
     def evaluate_step(self):
         """Look at the cards played and decide which player won the hand."""
@@ -267,11 +303,17 @@ class BriscolaGame:
             self.briscola.seed, self.played_cards
         )
         winner_player_id = self.players_order[ordered_winner_id]
+        print("actual winner", winner_player_id)
 
         points = sum([card.points for card in self.played_cards])
         winner_player = self.players[winner_player_id]
 
-        self.update_game(winner_player, points)
+        self.update_game(winner_player, points, self.gui_obj)
+        if self.gui_obj is not None:
+            if winner_player_id == 0:
+                self.gui_obj.insert_log(f"Human wins {points} points with {strongest_card.name}.")
+            else:
+                self.gui_obj.insert_log(f"Agent wins {points} points with {strongest_card.name}.")
         self.logger.PVP(
             f"Player {winner_player_id} wins {points} points with {strongest_card.name}."
         )
@@ -309,14 +351,24 @@ class BriscolaGame:
             )
 
         winner_player_id, winner_points = self.get_winner()
+        if winner_player_id == 0:
+            self.gui_obj.insert_log(f"Human wins with {winner_points} points!!")
+            self.gui_obj.insert_winner("Human")
+        else:
+            self.gui_obj.insert_log(f"Agent wins with {winner_points} points!!")
+            self.gui_obj.insert_winner("Agent")
         self.logger.PVP(f"Player {winner_player_id} wins with {winner_points} points!!")
-
         return winner_player_id, winner_points
 
-    def update_game(self, winner_player, points):
+    def update_game(self, winner_player, points, gui_obj=None):
         """Update the scores and the order based on who won the previous hand."""
         winner_player_id = winner_player.id
         winner_player.points += points
+        if gui_obj is not None:
+            if winner_player.id == 0:
+                gui_obj.update_player_score(winner_player.points)
+            elif winner_player.id == 1:
+                gui_obj.update_agent_score(winner_player.points)
 
         self.turn_player = winner_player_id
         self.players_order = self.get_players_order()
@@ -376,17 +428,24 @@ def scoring(briscola_seed, card_0, card_1, keep_order=True):
     return winner
 
 
-def play_episode(game, agents, train=True):
+def play_episode(game, agents, gui_obj=None, train=True):
     """Play an entire game updating the environment at each step.
     rewards_log will contain as key the agent's name and as value a list
     containing all the rewards that the agent has received at each step.
     """
-    game.reset()
+
+    players_order = None
+
+    # GUI: game.reset() is called from the GUI, that's why we avoid recalling it here
+    if gui_obj is None:
+        game.reset()
+
     rewards_log = {agent.name: [] for agent in agents}
     rewards = []
 
     for agent in agents:
-        agent.reset()
+        if agent.name != "HumanAgent":
+            agent.reset()
 
     while not game.check_end_game():
         # action step
@@ -402,22 +461,46 @@ def play_episode(game, agents, train=True):
 
             # the agent observes the state before acting
             agent.observe(game, player)
-        
+
             if train and rewards:
                 agent.update(rewards[i])
                 rewards_log[agent.name].append(rewards[i])
 
             available_actions = game.get_player_actions(player_id)
-            action = agent.select_action(available_actions)
+            if agent.name == "HumanAgent":
+                action = agent.select_action(available_actions, gui_obj)
+                # GUI: if the user presses "restart" the function "play_episode" returns and a new thread can be created
+                if action == -1:
+                    return
+            else:
+                action = agent.select_action(available_actions)
 
             # if agent.name == "QLearningAgent":
             #   print(f"state: {agent.state}")
-            #if agent.name == "RecurrentDeepQLearningAgent":
-                #print(f"history: {len(agent.history)}")
-                #print(agent.history)
+            # if agent.name == "RecurrentDeepQLearningAgent":
+            # print(f"history: {len(agent.history)}")
+            # print(agent.history)
             # print(f"{agent.name} plays {player.hand[action]} ({action})")
 
             game.play_step(action, player_id)
+
+            # GUI: waiting some time before the agent plays a card (just to simulate some thinking)
+            wait_time = 500  # in ms
+            if gui_obj is not None and player_id == 0:
+                gui_obj.notify_after(wait_time)
+                with gui_obj.cond:
+                    gui_obj.cond.wait()
+            if gui_obj is not None and player_id == 1:
+                if i == 0:
+                    gui_obj.notify_after(wait_time)
+                    with gui_obj.cond:
+                        gui_obj.cond.wait()
+                    gui_obj.agent_play_card(action)
+                else:
+                    gui_obj.agent_play_card(action)
+                    gui_obj.notify_after(wait_time)
+                    with gui_obj.cond:
+                        gui_obj.cond.wait()
 
             # Update agents deck since it can only observe the environment when
             # it's its turn. So for example if it's the first one to play he
@@ -432,12 +515,19 @@ def play_episode(game, agents, train=True):
         # print(card)
 
         # update the environment
-        rewards = game.get_rewards_from_step()
+        reward, winner_id = game.get_rewards_from_step()
 
         # for i, player_id in enumerate(game.get_players_order()):
         # print(f"{agents[player_id].name} gets reward {rewards[i]}")
 
-        game.draw_step()
+        # GUI: removing the two played cards from the table
+        if gui_obj is not None:
+            gui_obj.notify_after(700)
+            gui_obj.empty_table_frame(winner_id)
+            with gui_obj.cond:
+                gui_obj.cond.wait()
+
+        game.draw_step(gui_obj)
 
     # update for the terminal state
     for i, player_id in enumerate(players_order):
@@ -447,4 +537,7 @@ def play_episode(game, agents, train=True):
         if train and rewards:
             agent.update(rewards[i])
 
-    return (*game.end_game(), rewards_log)
+    if gui_obj is not None:
+        gui_obj.activate_restart(gui_obj)
+        gui_obj.reset = False
+    return *game.end_game(), rewards_log
