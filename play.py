@@ -17,11 +17,13 @@ def main(argv=None):
     agents = []
 
     if FLAGS.model_dir:
+        checkpoint = torch.load(FLAGS.model_dir)
+        config = checkpoint['config']
         agent = QAgent(
-            n_features=65,
-            n_actions=3,
-            epsilon=1.0,
-            minimum_epsilon=0.1,
+            n_features=config['n_features'],
+            n_actions=config['n_actions'],
+            epsilon=config['epsilon'],
+            minimum_epsilon=config['minimum_epsilon'],
             replay_memory_capacity=1000000,
             minimum_training_samples=2000,
             batch_size=256,
@@ -30,10 +32,11 @@ def main(argv=None):
             learning_rate=0.0001,
             replace_every=1000,
             epsilon_decay_rate=0.99998,
-            layers=[256, 256],
+            layers=config['layers'],
         )
-
-        agent.load(FLAGS.model_dir)
+        agent.policy_net.load_state_dict(checkpoint['policy_state_dict'])
+        print(agent.deck)
+        #agent.load(FLAGS.model_dir)
         agent.make_greedy()
         agents.append(agent)
     else:

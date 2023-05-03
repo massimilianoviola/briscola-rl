@@ -21,6 +21,7 @@ def train(
     num_evaluations: int,
     save: bool = False,
     save_dir: str = "",
+    checkpoint = {},
 ):
     """The agent is trained for num_epochs number of episodes following an
     epsilon-greedy policy. Every evaluate_every number of episodes the agent
@@ -28,8 +29,6 @@ def train(
     The winrate iobtained from these evaluations is used to select the best
     model and its weights are saved.
     """
-    rets = []
-
 
     best_total_wins = -1
     best_winrate = 0.0
@@ -62,7 +61,11 @@ def train(
             current_winrate = total_wins[0] / (total_wins[0] + total_wins[1])
             if current_winrate > best_winrate and save:
                 best_winrate = current_winrate
-                agents[0].save(save_dir + "model.pt")
+                checkpoint['policy_state_dict'] = agents[0].policy_net.state_dict()
+                checkpoint['optimizer_state_dict'] = agents[0].optimizer.state_dict()
+
+                torch.save(checkpoint, save_dir)
+                # agents[0].save(save_dir + "model.pt")
                 print("SAVED")
 
             for agent in agents:
@@ -76,11 +79,15 @@ def train(
                 agents[0].policy_net.state_dict(),
             )
 
-        #ret = np.sum(episode_rewards_log["QLearningAgent"])
-        #rets.append(ret)
-        #print(episode_rewards_log["QLearningAgent"])
         print(f"Episode: {epoch} epsilon: {agents[0].epsilon:.4f}", end="\r")
 
+    if save:
+        checkpoint['rewards'] = rewards_per_episode
+        checkpoint['winrates'] = winrates
+        checkpoint['points'] = points_log
+        torch.save(checkpoint, save_dir)
+
+    """
     if save:
         with open(save_dir + "rewards.pkl", "wb") as f:
             pickle.dump(rewards_per_episode, f)
@@ -90,7 +97,7 @@ def train(
 
         with open(save_dir + "points.pkl", "wb") as f:
             pickle.dump(points_log, f)
-
+    """
     return best_total_wins, rewards_per_episode
 
 
@@ -184,11 +191,17 @@ def main(argv=None):
         help="Path where model/data is saved.",
     )
 
+    parser.add_argument(
+        "--winning_reward",
+        type=int,
+        help="Extra reward given for winning the game",
+        default=100,
+    )
     args = parser.parse_args()
 
     # Initializing the environment
     logger = BriscolaLogger(BriscolaLogger.LoggerLevels.TRAIN)
-    game = brisc.BriscolaGame(2, logger)
+    game = brisc.BriscolaGame(2, logger, args.winning_reward)
 
     # Initialize agents
     agents = []
@@ -208,6 +221,16 @@ def main(argv=None):
         layers=[256, 256],
     )
 
+    checkpoint = {
+        'config': vars(agent),
+        'info': 'get_state, reward for winning, vs RulesAgent',
+        'policy_state_dict': None,
+        'optimizer_state_dict': None,
+        'rewards': [],
+        'winrates': [],
+        'points': [],
+    }
+
     agents.append(agent)
     if args.against == "AIAgent":
         agent = AIAgent()
@@ -225,6 +248,7 @@ def main(argv=None):
         args.num_evaluation,
         save=save_model,
         save_dir=args.path,
+        checkpoint=checkpoint,
     )
 
     print("FINISHED TRAINING")

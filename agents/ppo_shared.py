@@ -84,7 +84,7 @@ class PPOAgent:
 
         self.log = log
         self.ep = 0
-        self.max_takes = 100
+        self.max_takes = 10
 
     def reset_batch(self):
         self.states_batch = []
@@ -124,7 +124,7 @@ class PPOAgent:
             self.deck[card.number][card.seed] = 1
 
         deck = self.deck.flatten()
-        state = np.concatenate((state, deck))
+        #state = np.concatenate((state, deck))
 
         self.last_state = self.state
         self.state = state
@@ -158,7 +158,6 @@ class PPOAgent:
         self.log_probs_batch.append(self.log_prob)
         self.episode_rewards.append(self.reward)
         self.dones.append(self.done)
-
         if self.done:
             self.ep += 1
             self.rewards_batch.append(self.episode_rewards)
@@ -182,7 +181,7 @@ class PPOAgent:
         return returns
 
     def get_advantages(self, returns, values, normalize=True):
-        adv = returns - values.detach()
+        adv = returns - values.detach().squeeze()
         if normalize:
             adv = (adv - adv.mean()) / (adv.std() + 1e-10)
         return adv
@@ -238,7 +237,7 @@ class PPOAgent:
         returns = self.get_returns(self.rewards_batch)
         _, values = self.policy(self.states_batch)
         adv = self.get_advantages(returns, values)
-
+        #breakpoint()
         for _ in range(self.ppo_steps):
             curr_log_probs, values, entropy = self.evaluate(
                 self.states_batch, self.actions_batch
@@ -264,7 +263,8 @@ class PPOAgent:
 
         if self.log:
             print(
-                f"EPISODE #{self.ep} policy_loss: {policy_loss:.4f} value_loss: {value_loss:.4f} entropy_loss: {entropy_loss:.2f}"
+                f"EPISODE #{self.ep} policy_loss: {policy_loss:.4f} value_loss: {value_loss:.4f} entropy_loss: {entropy_loss:.2f}",
+                end='\r'
             )
 
     def make_greedy(self):

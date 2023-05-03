@@ -53,6 +53,7 @@ class QAgent:
         self.minimum_training_samples = minimum_training_samples
         self.batch_size = batch_size
 
+        self.layers = layers
         self.policy_net = DQN(n_features, n_actions, layers).to(self.device)
         self.target_net = DQN(n_features, n_actions, layers).to(self.device)
 
@@ -117,8 +118,8 @@ class QAgent:
         value_offset = 2
         seed_offset = 2
         features_per_card = 6
-        state[0] = 0#player.points
-        state[1] = 0#env.counter
+        state[0] = player.points
+        state[1] = env.counter
 
         for i, card in enumerate(player.hand):
             number_index = i * features_per_card + value_offset
@@ -145,14 +146,16 @@ class QAgent:
         in the deck. At each step of the episode the agent observes the played
         cards and the cards in his hand and sets the corresponding entries to 1
         """
-        state = np.zeros(25)
-        value_offset = 1
-        seed_offset = 3
+        state = np.zeros(26)
+        value_offset = 2
+        seed_offset = 2
         features_per_card = 6
         state[0] = player.points
+        state[1] = env.counter
+
         for i, card in enumerate(player.hand):
             number_index = i * features_per_card + value_offset
-            seed_index = i * features_per_card + seed_offset + card.seed
+            seed_index = i * features_per_card + seed_offset + card.seed + value_offset
             state[number_index] = card.number
             state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
             state[seed_index] = 1
@@ -161,7 +164,7 @@ class QAgent:
 
         for i, card in enumerate(env.played_cards):
             number_index = i + 3 * features_per_card + value_offset
-            seed_index = i + 3 * features_per_card + seed_offset + card.seed
+            seed_index = i + 3 * features_per_card + seed_offset + card.seed + value_offset
             state[number_index] = card.number
             state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
             state[seed_index] = 1
@@ -178,7 +181,6 @@ class QAgent:
     def select_action(self, available_actions):
         """Selects action according to an epsilon-greedy policy"""
         state = torch.from_numpy(self.state).float().to(self.device)
-
         if np.random.uniform() < self.epsilon:
             # Select a random action with probability epsilon
             action = np.random.choice(available_actions)

@@ -140,13 +140,14 @@ class BriscolaPlayer:
 class BriscolaGame:
     """Create the game environment with all the game stages."""
 
-    def __init__(self, num_players=2, logger=BriscolaLogger()):
+    def __init__(self, num_players=2, logger=BriscolaLogger(), bonus=100):
         self.num_players = num_players
         self.deck = BriscolaDeck()
         self.logger = logger
         self.won_the_match_points = False
         self.counter = 1
         self.screen = None
+        self.bonus = bonus
 
     def reset(self):
         """Start a new game."""
@@ -236,7 +237,7 @@ class BriscolaGame:
         winner_player_id, points = self.evaluate_step()
 
         rewards = []
-        extra_points = 0  # Points for winning
+        extra_points = self.bonus  # Points for winning
         count = 0
         for player_id in self.get_players_order():
             reward = points if player_id is winner_player_id else -points
@@ -245,9 +246,9 @@ class BriscolaGame:
             # Reward for winning the match
 
             player = self.players[player_id]
-            if self.won_the_match_points == False:
+            if self.bonus != 0 and self.won_the_match_points == False:
                 if player.points >= 60 and reward > 0:
-                    # print(f"PLAYER POINTS {player.points}")
+                    #print(f"PLAYER POINTS {player.points}")
                     reward += extra_points
                     self.won_the_match_points = True
                     if count == 0:
@@ -258,7 +259,7 @@ class BriscolaGame:
             count += 1
             rewards.append(reward)
 
-        # print(rewards)
+        #print(rewards)
         return rewards
 
     def evaluate_step(self):
@@ -392,7 +393,7 @@ def play_episode(game, agents, train=True):
         # action step
         players_order = game.get_players_order()
 
-        # print("-"*140)
+        #print("-"*140)
 
         for i, player_id in enumerate(players_order):
             player = game.players[player_id]
@@ -410,12 +411,13 @@ def play_episode(game, agents, train=True):
             available_actions = game.get_player_actions(player_id)
             action = agent.select_action(available_actions)
 
-            # if agent.name == "QLearningAgent":
-            #   print(f"state: {agent.state}")
+            #if agent.name == "PPOAgent":
+                #print(f"state: {agent.state}")
             #if agent.name == "RecurrentDeepQLearningAgent":
                 #print(f"history: {len(agent.history)}")
                 #print(agent.history)
-            # print(f"{agent.name} plays {player.hand[action]} ({action})")
+            
+            #print(f"{agent.name} plays {player.hand[action]} ({action})")
 
             game.play_step(action, player_id)
 
@@ -427,15 +429,14 @@ def play_episode(game, agents, train=True):
                 if agents[0].name == "QLearningAgent" or agents[0].name == "PPOAgent":
                     agents[0].deck[card.number][card.seed] = 1
 
-        # print("PLAYED:")
-        # for card in game.played_cards:
-        # print(card)
+        #print("PLAYED:")
+        #for card in game.played_cards:
+            #print(card)
 
         # update the environment
         rewards = game.get_rewards_from_step()
-
-        # for i, player_id in enumerate(game.get_players_order()):
-        # print(f"{agents[player_id].name} gets reward {rewards[i]}")
+        #for i, player_id in enumerate(game.get_players_order()):
+            #print(f"{agents[player_id].name} gets reward {rewards[i]}")
 
         game.draw_step()
 
@@ -444,6 +445,8 @@ def play_episode(game, agents, train=True):
         player = game.players[player_id]
         agent = agents[player_id]
         agent.observe(game, player)
+        #if agent.name == "PPOAgent":
+            #print(f"FINAL STATE: {agent.state}")
         if train and rewards:
             agent.update(rewards[i])
 

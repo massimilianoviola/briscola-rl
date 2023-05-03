@@ -48,6 +48,16 @@ def train():
         sequence_len=4,
     )
 
+    checkpoint = {
+        'config': vars(agent),
+        'info': 'get_state, reward for winning, vs RulesAgent',
+        'policy_state_dict': None,
+        'optimizer_state_dict': None,
+        'rewards': [],
+        'winrates': [],
+        'points': [],
+    }
+    
     agents.append(agent)
     agents.append(RandomAgent())
     # agents.append(AIAgent())

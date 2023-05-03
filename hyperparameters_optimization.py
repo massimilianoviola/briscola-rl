@@ -4,7 +4,7 @@ import random
 import optuna
 from agents.recurrent_q_agent import RecurrentDeepQAgent
 from agents.random_agent import RandomAgent
-from agents.ppo_shared import PPOAgent
+from agents.ppo_separated import PPOAgent
 from agents.ai_agent import AIAgent
 from evaluate import evaluate
 from utils import BriscolaLogger
@@ -17,34 +17,36 @@ def objective(trial):
     game = brisc.BriscolaGame(2, logger)
 
     lr = trial.suggest_float("lr", 1e-5, 1e-2)
-    ppo_clip = trial.suggest_float("ppo_clip", .1, .3)
-    ppo_steps = trial.suggest_int("ppo_steps", 1, 50)
-    value_coeff = trial.suggest_float("value_coeff", .5, 1.0)
-    batch_size = 100 # trial.suggest_int("batch_size", 1, 100)
+    ppo_clip = trial.suggest_categorical("ppo_clip", [.1, .2, .3])
+    ppo_steps = trial.suggest_int("ppo_steps", 1, 30)
+    #value_coeff = trial.suggest_float("value_coeff", .5, 1.0)
+    batch_size = 50 # trial.suggest_int("batch_size", 1, 100)
     discount = .90 # trial.suggest_float("discount", .8, .99)
 
     # Initialize agents
     agents = []
     agent = PPOAgent(
-        n_features=65,
+        n_features=26,
         n_actions=3,
         discount=discount,
+        gae_lambda=0.95,
         critic_loss_fn=torch.nn.SmoothL1Loss(),
-        learning_rate=lr,
-        actor_layers=[256, 256],
-        critic_layers=[256, 256],
+        actor_learning_rate=lr,
+        critic_learning_rate=lr,
+        actor_layers=[128, 128],
+        critic_layers=[128, 128],
         ppo_steps=ppo_steps,
         ppo_clip=ppo_clip,
         ent_coeff=0.01,
-        value_coeff=value_coeff,
+        # value_coeff=value_coeff,
         batch_size=batch_size,
         log=False,
     )
     agents.append(agent)
     agents.append(RandomAgent())
 
-    num_epochs = 10000
-    evaluate_every = 1000
+    num_epochs = 20000
+    evaluate_every = 5000
     num_evaluations = 1000
 
     winrates = []

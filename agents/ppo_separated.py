@@ -115,7 +115,7 @@ class PPOAgent:
 
         self.log = log
         self.ep = 0
-        self.max_takes = 100
+        self.max_takes = 10
 
     def reset_batch(self):
         self.states_batch = []
@@ -131,14 +131,16 @@ class PPOAgent:
 
     def get_state(self, env, player):
         """"""
-        state = np.zeros(25)
-        value_offset = 1
-        seed_offset = 3
+        state = np.zeros(26)
+        value_offset = 2
+        seed_offset = 2
         features_per_card = 6
         state[0] = player.points
+        state[1] = env.counter
+
         for i, card in enumerate(player.hand):
             number_index = i * features_per_card + value_offset
-            seed_index = i * features_per_card + seed_offset + card.seed
+            seed_index = i * features_per_card + seed_offset + card.seed + value_offset
             state[number_index] = card.number
             state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
             state[seed_index] = 1
@@ -147,7 +149,7 @@ class PPOAgent:
 
         for i, card in enumerate(env.played_cards):
             number_index = i + 3 * features_per_card + value_offset
-            seed_index = i + 3 * features_per_card + seed_offset + card.seed
+            seed_index = i + 3 * features_per_card + seed_offset + card.seed + value_offset
             state[number_index] = card.number
             state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
             state[seed_index] = 1
@@ -155,7 +157,7 @@ class PPOAgent:
             self.deck[card.number][card.seed] = 1
 
         deck = self.deck.flatten()
-        state = np.concatenate((state, deck))
+        #state = np.concatenate((state, deck))
 
         self.last_state = self.state
         self.state = state
@@ -164,6 +166,7 @@ class PPOAgent:
     def select_action(self, available_actions):
         state = torch.from_numpy(self.state).float().to(self.device)
         actions_probabilities = self.actor_net(state)
+        #print(actions_probabilities)
         dist = distributions.Categorical(actions_probabilities)
         takes = 0
         while True:
@@ -177,7 +180,9 @@ class PPOAgent:
             self.log_prob = dist.log_prob(self.action).detach()
             if self.action in available_actions:
                 break
-
+        
+        #print(f'state: {state}')
+        #print(f'probs {actions_probabilities.detach()} ---> {self.action}')
         return self.action.item()
 
     def get_returns(self, rewards_batch, normalize=True):
@@ -203,7 +208,7 @@ class PPOAgent:
             adv = (adv - adv.mean()) / (adv.std() + 1e-10)
         return adv
 
-    def gae_advantages(self, rewards_batch, values, dones, normalize=True):
+    def gae_advantages(self, rewards_batch, values, dones, norm_adv=True, norm_ret=False):
         v = values.detach()
         rewards = rewards_batch.flatten()
         adv = np.zeros_like(rewards)
@@ -222,8 +227,9 @@ class PPOAgent:
         adv = torch.Tensor(adv).to(self.device)
         ret = adv + v
 
-        if normalize:
+        if norm_adv:
             adv = (adv - adv.mean()) / (adv.std() + 1e-10)
+        if norm_ret:
             ret = (ret - ret.mean()) / (ret.std() + 1e-10)
 
         return adv, ret
@@ -237,17 +243,26 @@ class PPOAgent:
 
     def update(self, reward):
         self.reward = reward
-
+        #print(f'reward: {reward}')
+        #print('-'*100)
         self.states_batch.append(self.last_state)
         self.actions_batch.append(self.action)
         self.log_probs_batch.append(self.log_prob)
         self.episode_rewards.append(self.reward)
         self.dones.append(self.done)
-
+        '''
+        print('*'*140)
+        print(f'UPDATING')
+        print(f'last_state {self.last_state}')
+        print(f'action {self.action}')
+        print(f'reward {self.reward}')
+        print(f'state {self.state}')
+        print('*'*140)
+        '''
         if self.done:
             self.ep += 1
             self.rewards_batch.append(self.episode_rewards)
-
+            #print(self.episode_rewards)
             self.episode_rewards = []
             if len(self.rewards_batch) >= self.batch_size:
                 self.learn()
@@ -259,12 +274,13 @@ class PPOAgent:
         self.log_probs_batch = torch.Tensor(np.array(self.log_probs_batch))
         self.rewards_batch = torch.Tensor(np.array(self.rewards_batch))
 
-        #returns = self.get_returns(self.rewards_batch)
+        returns = self.get_returns(self.rewards_batch, True)
+        #print(returns)
         values = self.get_values(self.states_batch)
-        # adv = self.get_advantages(returns, values)
-        adv, returns = self.gae_advantages(self.rewards_batch, values, self.dones, True)
-
+        #adv = self.get_advantages(returns, values)
+        adv, returns = self.gae_advantages(self.rewards_batch, values, self.dones, True, True)
         for _ in range(self.ppo_steps):
+            #breakpoint()
             # values = self.get_values(self.states_batch)
             curr_log_probs, values, entropy = self.evaluate(
                 self.states_batch, self.actions_batch
@@ -286,12 +302,13 @@ class PPOAgent:
             self.critic_opt.zero_grad()
             critic_loss.backward()
             self.critic_opt.step()
+            #print()
 
         if self.log:
             print(f"EPISODE #{self.ep}", end=" ")
             print(f"actor_loss: {actor_loss.detach():.4f}", end=" ")
             print(f"critic_loss: {critic_loss.detach():.4f}", end=" ")
-            print(f"entropy_loss: {-entropy_loss:.4f}", end="\n")
+            print(f"entropy_loss: {entropy_loss:.4f}", end="\n")
 
     def make_greedy(self):
         pass
