@@ -44,6 +44,8 @@ def train(
         game_winner_id, winner_points, episode_rewards_log = brisc.play_episode(
             game,
             agents,
+            None,
+            True,
         )
 
         rewards_per_episode.append(episode_rewards_log)
@@ -201,7 +203,7 @@ def main(argv=None):
 
     # Initializing the environment
     logger = BriscolaLogger(BriscolaLogger.LoggerLevels.TRAIN)
-    game = brisc.BriscolaGame(2, logger, args.winning_reward)
+    game = brisc.BriscolaGame(2, logger, None, args.winning_reward)
 
     # Initialize agents
     agents = []

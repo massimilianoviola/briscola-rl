@@ -65,7 +65,7 @@ class PPOAgent:
         ppo_steps: int = 5,
         ppo_clip: float = 0.2,
         ent_coeff: float = 0.0,
-        batch_size: int = 32,
+        num_episodes: int = 32,
         device=None,
         log=True,
     ) -> None:
@@ -111,7 +111,7 @@ class PPOAgent:
         self.ppo_steps = ppo_steps
         self.ppo_clip = ppo_clip
         self.ent_coeff = ent_coeff
-        self.batch_size = batch_size
+        self.num_episodes = num_episodes
 
         self.log = log
         self.ep = 0
@@ -264,7 +264,7 @@ class PPOAgent:
             self.rewards_batch.append(self.episode_rewards)
             #print(self.episode_rewards)
             self.episode_rewards = []
-            if len(self.rewards_batch) >= self.batch_size:
+            if len(self.rewards_batch) >= self.num_episodes:
                 self.learn()
                 self.reset_batch()
 
@@ -277,8 +277,8 @@ class PPOAgent:
         returns = self.get_returns(self.rewards_batch, True)
         #print(returns)
         values = self.get_values(self.states_batch)
-        #adv = self.get_advantages(returns, values)
-        adv, returns = self.gae_advantages(self.rewards_batch, values, self.dones, True, True)
+        adv = self.get_advantages(returns, values)
+        #adv, returns = self.gae_advantages(self.rewards_batch, values, self.dones, True, True)
         for _ in range(self.ppo_steps):
             #breakpoint()
             # values = self.get_values(self.states_batch)

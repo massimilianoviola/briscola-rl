@@ -10,21 +10,21 @@ class QAgent:
     """Q-learning agent"""
 
     def __init__(
-        self,
-        n_features: int,
-        n_actions: int,
-        replay_memory_capacity: int,
-        minimum_training_samples: int,
-        batch_size: int,
-        discount: float,
-        loss_fn,
-        learning_rate: float,
-        replace_every: int,
-        epsilon: float,
-        minimum_epsilon: float,
-        epsilon_decay_rate: float,
-        layers: List[int] = [256, 256],
-        device=None,
+            self,
+            n_features: int,
+            n_actions: int,
+            replay_memory_capacity: int,
+            minimum_training_samples: int,
+            batch_size: int,
+            discount: float,
+            loss_fn,
+            learning_rate: float,
+            replace_every: int,
+            epsilon: float,
+            minimum_epsilon: float,
+            epsilon_decay_rate: float,
+            layers: List[int] = [256, 256],
+            device=None,
     ) -> None:
         """"""
         self.name = "QLearningAgent"
@@ -140,8 +140,7 @@ class QAgent:
         self.done = env.check_end_game()
 
     def get_state(self, env, player):
-        """FINAL VERSION OF THE STATE
-        To the state obtained from self.get_state_just_hand() is appended
+        """To the state obtained from self.get_state_just_hand() is appended
         a vector of length 40. Each entry is associated with one card
         in the deck. At each step of the episode the agent observes the played
         cards and the cards in his hand and sets the corresponding entries to 1
@@ -263,7 +262,7 @@ class QAgent:
         next_state_max_q = target_q_values.max(dim=1)[0]
 
         # r + discount * Q_max(s)
-        target = rewards + (self.discount * next_state_max_q * (1-done.float()))
+        target = rewards + (self.discount * next_state_max_q * (1 - done.float()))
         target = target.unsqueeze(1)
 
         loss = self.loss_fn(q_state_action, target)

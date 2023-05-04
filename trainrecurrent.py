@@ -44,6 +44,8 @@ def train(
         game_winner_id, winner_points, episode_rewards_log = brisc.play_episode(
             game,
             agents,
+            None,
+            True,
         )
 
         rewards_per_episode.append(episode_rewards_log)
@@ -190,7 +192,7 @@ def main(argv=None):
 
     # Initializing the environment
     logger = BriscolaLogger(BriscolaLogger.LoggerLevels.TRAIN)
-    game = brisc.BriscolaGame(2, logger, args.winning_reward)
+    game = brisc.BriscolaGame(2, logger, None,args.winning_reward)
 
     # Initialize agents
     agents = []
@@ -205,7 +207,7 @@ def main(argv=None):
         discount=0.95,
         loss_fn=torch.nn.SmoothL1Loss(),
         learning_rate=1e-4,
-        replace_every=1000,
+        replace_every=500,
         epsilon_decay_rate=0.999998,
         hidden_size=128,
         fully_connected_layers=128,

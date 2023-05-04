@@ -50,7 +50,7 @@ class PPOAgent:
         ppo_clip: float = 0.2,
         ent_coeff: float = 0.01,
         value_coeff: float = 0.5,
-        batch_size: int = 64,
+        num_episodes: int = 64,
         device=None,
         log=True,
     ) -> None:
@@ -72,7 +72,7 @@ class PPOAgent:
         self.ppo_clip = ppo_clip
         self.ent_coeff = ent_coeff
         self.value_coeff = value_coeff
-        self.batch_size = batch_size
+        self.num_episodes = num_episodes
 
         self.reset_batch()
 
@@ -163,7 +163,7 @@ class PPOAgent:
             self.rewards_batch.append(self.episode_rewards)
             self.episode_rewards = []
 
-            if len(self.rewards_batch) >= self.batch_size:
+            if len(self.rewards_batch) >= self.num_episodes:
                 self.learn()
                 self.reset_batch()
 
