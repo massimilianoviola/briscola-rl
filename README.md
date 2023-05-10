@@ -9,8 +9,8 @@ Run `python gui/briscola_gui.py` and play!
 
 ### How to build an executable using *Pyinstaller*
 
-1. Move to the GUI folder `cd briscola-rl/gui`
-2. Run *Pyinstaller* `pyinstaller.py briscola_gui.spec` and wait...
+1. Move to the GUI folder `cd gui`
+2. Run `pyinstaller briscola_gui.spec` and wait...
 3. You can find the executable `briscola_gui.exe` on `briscola-rl/gui/dist`
 
 ### Can I run the other files without using the GUI?    

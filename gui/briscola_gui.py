@@ -9,7 +9,11 @@ import threading
 from functools import partial
 from tkinter import *
 from tkinter import ttk, messagebox
-
+import environment as brisc
+from agents.ai_agent import AIAgent
+from agents.human_agent import HumanAgent
+from agents.q_agent import QAgent
+from utils import NetworkTypes, BriscolaLogger
 import _tkinter
 from PIL import ImageTk, Image
 from PIL.Image import Resampling
@@ -17,16 +21,11 @@ from PIL.Image import Resampling
 current_file_path = os.path.dirname(__file__)
 sys.path.append(os.path.join(current_file_path, '..'))
 
-import environment as brisc
-from agents.ai_agent import AIAgent
-from agents.human_agent import HumanAgent
-from agents.q_agent import QAgent
-from utils import NetworkTypes, BriscolaLogger
-
 
 def resource_path(relative_path):
     """
-    This function is necessary for gathering the card images paths when the executable is used.
+    This function is necessary for gathering the card images paths when the executable (generated with Pyinstaller) is
+    run.
     """
     try:
         base_path = sys._MEIPASS
@@ -126,7 +125,7 @@ class BriscolaGui:
     @classmethod
     def find_card_name(cls, card, card_images):
         """
-        Finds the filename of the card image
+        Finds the filename of the card image.
 
         @param card: card object of the Briscola game
         @param card_images: list of all cards images objects
