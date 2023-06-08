@@ -14,14 +14,14 @@ from utils import BriscolaLogger
 
 
 def train(
-    game,
-    agents,
-    num_epochs: int,
-    evaluate_every: int,
-    num_evaluations: int,
-    save: bool = False,
-    save_dir: str = "",
-    checkpoint = {},
+        game,
+        agents,
+        num_epochs: int,
+        evaluate_every: int,
+        num_evaluations: int,
+        save: bool = False,
+        save_dir: str = "",
+        checkpoint=None,
 ):
     """The agent is trained for num_epochs number of episodes following an
     epsilon-greedy policy. Every evaluate_every number of episodes the agent
@@ -35,7 +35,13 @@ def train(
 
     rewards_per_episode = []
     points_log = []
-    winrates = []
+    winrates = checkpoint['winrates']
+
+    for e in winrates:
+        winrate = e[0] / (e[0] + e[1])
+        if winrate > best_winrate:
+            best_winrate = winrate
+
     if save:
         if not os.path.exists(os.path.dirname(save_dir)):
             os.makedirs(os.path.dirname(save_dir))
@@ -89,17 +95,15 @@ def train(
         checkpoint['points'] = points_log
         torch.save(checkpoint, save_dir)
 
-    """
-    if save:
-        with open(save_dir + "rewards.pkl", "wb") as f:
-            pickle.dump(rewards_per_episode, f)
-
-        with open(save_dir + "winrates.pkl", "wb") as f:
-            pickle.dump(winrates, f)
-
-        with open(save_dir + "points.pkl", "wb") as f:
-            pickle.dump(points_log, f)
-    """
+    # if save:
+    #     with open(save_dir + "rewards.pkl", "wb") as f:
+    #         pickle.dump(rewards_per_episode, f)
+    #
+    #     with open(save_dir + "winrates.pkl", "wb") as f:
+    #         pickle.dump(winrates, f)
+    #
+    #     with open(save_dir + "points.pkl", "wb") as f:
+    #         pickle.dump(points_log, f)
     return best_total_wins, rewards_per_episode
 
 
@@ -121,7 +125,7 @@ def main(argv=None):
         "--episodes",
         type=int,
         help="Number of training episodes",
-        default=10000,
+        default=1000,
     )
 
     parser.add_argument(
@@ -163,7 +167,7 @@ def main(argv=None):
         "--evaluate_every",
         type=int,
         help="Number of episode after which evaluate the agent",
-        default=1000,
+        default=100,
     )
 
     parser.add_argument(
@@ -191,6 +195,7 @@ def main(argv=None):
         "--path",
         type=str,
         help="Path where model/data is saved.",
+        default=f"models/{parser.parse_args().agent}.pt",
     )
 
     parser.add_argument(
@@ -198,6 +203,13 @@ def main(argv=None):
         type=int,
         help="Extra reward given for winning the game",
         default=100,
+    )
+
+    parser.add_argument(
+        "--checkpoint_path",
+        type=str,
+        help="Path of the model checkpoint",
+        default=f"models/{parser.parse_args().agent}.pt",
     )
     args = parser.parse_args()
 
@@ -207,31 +219,56 @@ def main(argv=None):
 
     # Initialize agents
     agents = []
-    agent = QAgent(
-        n_features=26,
-        n_actions=3,
-        epsilon=args.epsilon,
-        minimum_epsilon=args.minimum_epsilon,
-        replay_memory_capacity=1000000,
-        minimum_training_samples=2000,
-        batch_size=256,
-        discount=args.discount,
-        loss_fn=torch.nn.SmoothL1Loss(),
-        learning_rate=args.lr,
-        replace_every=args.replace_every,
-        epsilon_decay_rate=args.epsilon_decay_rate,
-        layers=[256, 256],
-    )
+    if args.checkpoint_path:
+        print("Resuming training from checkpoint...")
+        try:
+            checkpoint = torch.load(args.checkpoint_path)
+            config = checkpoint['config']
+            agent = QAgent(
+                n_features=config['n_features'],
+                n_actions=config['n_actions'],
+                epsilon=config['epsilon'],
+                minimum_epsilon=config['minimum_epsilon'],
+                replay_memory_capacity=1000000,
+                minimum_training_samples=2000,
+                batch_size=256,
+                discount=0.95,
+                loss_fn=torch.nn.SmoothL1Loss(),
+                learning_rate=0.0001,
+                replace_every=1000,
+                epsilon_decay_rate=0.99998,
+                layers=config['layers'],
+            )
+            agent.policy_net.load_state_dict(checkpoint['policy_state_dict'])
+        except FileNotFoundError:
+            print("ERROR: the checkpoint file does not exist. Check the arguments specified in the file train.py.")
+            exit()
+    else:
+        agent = QAgent(
+            n_features=26,
+            n_actions=3,
+            epsilon=args.epsilon,
+            minimum_epsilon=args.minimum_epsilon,
+            replay_memory_capacity=1000000,
+            minimum_training_samples=2000,
+            batch_size=256,
+            discount=args.discount,
+            loss_fn=torch.nn.SmoothL1Loss(),
+            learning_rate=args.lr,
+            replace_every=args.replace_every,
+            epsilon_decay_rate=args.epsilon_decay_rate,
+            layers=[256, 256],
+        )
 
-    checkpoint = {
-        'config': vars(agent),
-        'info': 'get_state, reward for winning, vs RulesAgent',
-        'policy_state_dict': None,
-        'optimizer_state_dict': None,
-        'rewards': [],
-        'winrates': [],
-        'points': [],
-    }
+        checkpoint = {
+            'config': vars(agent),
+            'info': 'get_state, reward for winning, vs RulesAgent',
+            'policy_state_dict': None,
+            'optimizer_state_dict': None,
+            'rewards': [],
+            'winrates': [],
+            'points': [],
+        }
 
     agents.append(agent)
     if args.against == "AIAgent":

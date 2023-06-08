@@ -9,6 +9,9 @@ import threading
 from functools import partial
 from tkinter import *
 from tkinter import ttk, messagebox
+
+import torch
+
 import environment as brisc
 from agents.ai_agent import AIAgent
 from agents.human_agent import HumanAgent
@@ -534,20 +537,43 @@ class BriscolaGui:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_dir", default=None,
-                        help="Provide a trained model path if you want to play against a deep agent", type=str)
-    parser.add_argument("--network", default=NetworkTypes.DRQN, choices=[NetworkTypes.DQN, NetworkTypes.DRQN],
-                        help="Neural network used for approximating value function")
-    flags = parser.parse_args()
+
+    parser.add_argument(
+        "--model_dir",
+        default=None,
+        help="Trained model path if you want to play against a deep agent",
+        type=str,
+    )
+
+    FLAGS = parser.parse_args()
 
     briscola_gui = BriscolaGui()
 
-    if flags.model_dir:
-        agent = QAgent(network=flags.network)
-        agent.load_model(flags.model_dir)
+    if FLAGS.model_dir:
+        checkpoint = torch.load(FLAGS.model_dir)
+        config = checkpoint['config']
+        agent = QAgent(
+            n_features=config['n_features'],
+            n_actions=config['n_actions'],
+            epsilon=config['epsilon'],
+            minimum_epsilon=config['minimum_epsilon'],
+            replay_memory_capacity=1000000,
+            minimum_training_samples=2000,
+            batch_size=256,
+            discount=0.95,
+            loss_fn=torch.nn.SmoothL1Loss(),
+            learning_rate=0.0001,
+            replace_every=1000,
+            epsilon_decay_rate=0.99998,
+            layers=config['layers'],
+        )
+        agent.policy_net.load_state_dict(checkpoint['policy_state_dict'])
+        print(agent.deck)
+        # agent.load(FLAGS.model_dir)
         agent.make_greedy()
         briscola_gui.agent = agent
     else:
+        # specify the agent
         agent = AIAgent()
         briscola_gui.agent = agent
 
