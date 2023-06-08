@@ -26,21 +26,23 @@ def train(
     """The agent is trained for num_epochs number of episodes following an
     epsilon-greedy policy. Every evaluate_every number of episodes the agent
     is evaluated by playing num_evaluations number of games.
-    The winrate iobtained from these evaluations is used to select the best
+    The winrate is obtained from these evaluations is used to select the best
     model and its weights are saved.
     """
 
     best_total_wins = -1
     best_winrate = 0.0
 
-    rewards_per_episode = []
-    points_log = []
+    rewards_per_episode = checkpoint['rewards']
+    print(f"N° actual rewards: {len(rewards_per_episode)}")
+    points_log = checkpoint['points']
     winrates = checkpoint['winrates']
 
     for e in winrates:
         winrate = e[0] / (e[0] + e[1])
         if winrate > best_winrate:
             best_winrate = winrate
+    print(f"Best winrate: {best_winrate * 100}%\n")
 
     if save:
         if not os.path.exists(os.path.dirname(save_dir)):
@@ -64,20 +66,28 @@ def train(
             for agent in agents:
                 agent.make_greedy()
             total_wins, points_history = evaluate(game, agents, num_evaluations)
+            for agent in agents:
+                agent.restore_epsilon()
             winrates.append(total_wins)
 
             current_winrate = total_wins[0] / (total_wins[0] + total_wins[1])
             if current_winrate > best_winrate and save:
+                print(f"Saving the checkpoint...\n"
+                      f"New best winrate: {current_winrate * 100}% > {best_winrate * 100}%")
                 best_winrate = current_winrate
+
+                checkpoint['config'] = vars(agents[0])
                 checkpoint['policy_state_dict'] = agents[0].policy_net.state_dict()
                 checkpoint['optimizer_state_dict'] = agents[0].optimizer.state_dict()
+                checkpoint['rewards'] = rewards_per_episode
+                checkpoint['winrates'] = winrates
+                checkpoint['points'] = points_log
 
                 torch.save(checkpoint, save_dir)
                 # agents[0].save(save_dir + "model.pt")
-                print("SAVED")
+                print(f"N° rewards updated: {len(checkpoint['rewards'])}\n"
+                      f"Actual epsilon: {agents[0].epsilon}SAVED\n")
 
-            for agent in agents:
-                agent.restore_epsilon()
             if total_wins[0] > best_total_wins:
                 best_total_wins = total_wins[0]
 
@@ -88,12 +98,6 @@ def train(
             )
 
         print(f"Episode: {epoch} epsilon: {agents[0].epsilon:.4f}", end="\r")
-
-    if save:
-        checkpoint['rewards'] = rewards_per_episode
-        checkpoint['winrates'] = winrates
-        checkpoint['points'] = points_log
-        torch.save(checkpoint, save_dir)
 
     # if save:
     #     with open(save_dir + "rewards.pkl", "wb") as f:
@@ -119,13 +123,6 @@ def main(argv=None):
         type=str,
         help="Agent to train",
         default="QLearningAgent",
-    )
-
-    parser.add_argument(
-        "--episodes",
-        type=int,
-        help="Number of training episodes",
-        default=1000,
     )
 
     parser.add_argument(
@@ -163,18 +160,27 @@ def main(argv=None):
         default=1e-4,
     )
 
+    # ----------------------------
+    parser.add_argument(
+        "--episodes",
+        type=int,
+        help="Number of training episodes",
+        default=10000,
+    )
+
     parser.add_argument(
         "--evaluate_every",
         type=int,
         help="Number of episode after which evaluate the agent",
-        default=100,
+        default=1000,
     )
+    # ----------------------------
 
     parser.add_argument(
         "--num_evaluation",
         type=int,
         help="Number of games to perform evaluation",
-        default=1000,
+        default=200,
     )
 
     parser.add_argument(
@@ -219,8 +225,32 @@ def main(argv=None):
 
     # Initialize agents
     agents = []
+    agent = QAgent(
+        n_features=26,
+        n_actions=3,
+        epsilon=args.epsilon,
+        minimum_epsilon=args.minimum_epsilon,
+        replay_memory_capacity=1000000,
+        minimum_training_samples=2000,
+        batch_size=256,
+        discount=args.discount,
+        loss_fn=torch.nn.SmoothL1Loss(),
+        learning_rate=args.lr,
+        replace_every=args.replace_every,
+        epsilon_decay_rate=args.epsilon_decay_rate,
+        layers=[256, 256],
+    )
+    checkpoint = {
+        'config': vars(agent),
+        'info': 'get_state, reward for winning, vs RulesAgent',
+        'policy_state_dict': None,
+        'optimizer_state_dict': None,
+        'rewards': [],
+        'winrates': [],
+        'points': [],
+    }
     if args.checkpoint_path:
-        print("Resuming training from checkpoint...")
+        print("Resuming training from checkpoint...\n")
         try:
             checkpoint = torch.load(args.checkpoint_path)
             config = checkpoint['config']
@@ -241,34 +271,9 @@ def main(argv=None):
             )
             agent.policy_net.load_state_dict(checkpoint['policy_state_dict'])
         except FileNotFoundError:
-            print("ERROR: the checkpoint file does not exist. Check the arguments specified in the file train.py.")
-            exit()
-    else:
-        agent = QAgent(
-            n_features=26,
-            n_actions=3,
-            epsilon=args.epsilon,
-            minimum_epsilon=args.minimum_epsilon,
-            replay_memory_capacity=1000000,
-            minimum_training_samples=2000,
-            batch_size=256,
-            discount=args.discount,
-            loss_fn=torch.nn.SmoothL1Loss(),
-            learning_rate=args.lr,
-            replace_every=args.replace_every,
-            epsilon_decay_rate=args.epsilon_decay_rate,
-            layers=[256, 256],
-        )
-
-        checkpoint = {
-            'config': vars(agent),
-            'info': 'get_state, reward for winning, vs RulesAgent',
-            'policy_state_dict': None,
-            'optimizer_state_dict': None,
-            'rewards': [],
-            'winrates': [],
-            'points': [],
-        }
+            print("ERROR: the checkpoint file does not exist. Check the arguments specified in the file train.py."
+                  "\nTraining a new model...\n")
+            pass
 
     agents.append(agent)
     if args.against == "AIAgent":
@@ -290,7 +295,7 @@ def main(argv=None):
         checkpoint=checkpoint,
     )
 
-    print("FINISHED TRAINING")
+    print("\nFINISHED TRAINING")
 
 
 if __name__ == "__main__":

@@ -507,7 +507,7 @@ def play_episode(game, agents, gui_obj=None, train=True):
             ####################################################################
             # You agents[0] because I always added the agent to be trained     #
             # first in agents.                                                 #
-            # THIS PART SHOULD should be updated to work in all scenarios      #
+            # THIS PART SHOULD be updated to work in all scenarios             #
             ####################################################################
             for card in game.played_cards:
                 if agents[0].name == "QLearningAgent" or agents[0].name == "PPOAgent":
