@@ -277,19 +277,16 @@ class BriscolaGame:
         count = 0
         for player_id in self.get_players_order():
             reward = points if player_id is winner_player_id else -points
-            # reward = 1 if player_id is winner_player_id else -1
-            # reward = points if player_id is winner_player_id else 0
+
             # Reward for winning the match
-            
             #############################################################
             # This part of the code that gives additional reward        #
             # needs to be modified to work with more than 2 players     #
             #############################################################
-
             player = self.players[player_id]
-            if self.bonus != 0 and self.won_the_match_points == False:
+            if self.bonus != 0 and not self.won_the_match_points:
                 if player.points >= 60 and reward > 0:
-                    #print(f"PLAYER POINTS {player.points}")
+                    # print(f"PLAYER POINTS {player.points}")
                     reward += extra_points
                     self.won_the_match_points = True
                     if count == 0:
@@ -309,7 +306,7 @@ class BriscolaGame:
             self.briscola.seed, self.played_cards
         )
         winner_player_id = self.players_order[ordered_winner_id]
-        #print("actual winner", winner_player_id)
+        # print("actual winner", winner_player_id)
 
         points = sum([card.points for card in self.played_cards])
         winner_player = self.players[winner_player_id]
@@ -443,7 +440,8 @@ def play_episode(game, agents, gui_obj=None, train=True):
 
     players_order = None
 
-    # GUI: game.reset() is called from the GUI, that's why we avoid recalling it here
+    # ---GUI ---
+    # game reset is called from the GUI, that's why we avoid recalling it here in case we use the GUI
     if gui_obj is None:
         game.reset()
 
@@ -474,7 +472,8 @@ def play_episode(game, agents, gui_obj=None, train=True):
             available_actions = game.get_player_actions(player_id)
             if agent.name == "HumanAgent":
                 action = agent.select_action(available_actions, gui_obj)
-                # GUI: if the user presses "restart" the function "play_episode" returns and a new thread can be created
+                # ---GUI ---
+                # if the user presses "restart" the function "play_episode" returns and a new thread can be created
                 if action == -1:
                     return
             else:
@@ -482,7 +481,8 @@ def play_episode(game, agents, gui_obj=None, train=True):
 
             game.play_step(action, player_id)
 
-            # GUI: waiting some time before the agent plays a card (just to simulate some thinking)
+            # ---GUI ---
+            # waiting some time before the agent plays a card (just to simulate some thinking)
             wait_time = 500  # in ms
             if gui_obj is not None and player_id == 0:
                 gui_obj.notify_after(wait_time)
@@ -519,7 +519,8 @@ def play_episode(game, agents, gui_obj=None, train=True):
         # for i, player_id in enumerate(game.get_players_order()):
         # print(f"{agents[player_id].name} gets reward {rewards[i]}")
 
-        # GUI: removing the two played cards from the table
+        # ---GUI ---
+        # removing the two played cards from the table
         if gui_obj is not None:
             gui_obj.notify_after(700)
             gui_obj.empty_table_frame(winner_id)
@@ -533,11 +534,12 @@ def play_episode(game, agents, gui_obj=None, train=True):
         player = game.players[player_id]
         agent = agents[player_id]
         agent.observe(game, player)
-        #if agent.name == "PPOAgent":
-            #print(f"FINAL STATE: {agent.state}")
+        # if agent.name == "PPOAgent":
+        # print(f"FINAL STATE: {agent.state}")
         if train and rewards:
             agent.update(rewards[i])
 
+    # --- GUI ---
     if gui_obj is not None:
         gui_obj.activate_restart(gui_obj)
         gui_obj.reset = False

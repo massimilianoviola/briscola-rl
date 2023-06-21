@@ -148,8 +148,8 @@ class PPOAgent:
             self.deck[card.number][card.seed] = 1
 
         for i, card in enumerate(env.played_cards):
-            number_index = i + 3 * features_per_card + value_offset
-            seed_index = i + 3 * features_per_card + seed_offset + card.seed + value_offset
+            number_index = (i + 3) * features_per_card + value_offset
+            seed_index = (i + 3) * features_per_card + seed_offset + card.seed + value_offset
             state[number_index] = card.number
             state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
             state[seed_index] = 1

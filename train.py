@@ -4,6 +4,8 @@ import pickle
 import random
 import numpy as np
 import torch
+from tqdm import tqdm
+
 import environment as brisc
 import matplotlib.pyplot as plt
 from agents.random_agent import RandomAgent
@@ -42,18 +44,17 @@ def train(
         winrate = e[0] / (e[0] + e[1])
         if winrate > best_winrate:
             best_winrate = winrate
-    print(f"Best winrate: {best_winrate * 100}%\n")
+    print(f"Best winrate: {best_winrate * 100}%")
 
     if save:
         if not os.path.exists(os.path.dirname(save_dir)):
             os.makedirs(os.path.dirname(save_dir))
 
-    for epoch in range(1, num_epochs + 1):
+    for epoch in tqdm(range(1, num_epochs + 1)):
         game_winner_id, winner_points, episode_rewards_log = brisc.play_episode(
             game,
             agents,
-            None,
-            True,
+            train=True,
         )
 
         rewards_per_episode.append(episode_rewards_log)
@@ -165,7 +166,7 @@ def main(argv=None):
         "--episodes",
         type=int,
         help="Number of training episodes",
-        default=10000,
+        default=25000,
     )
 
     parser.add_argument(
@@ -221,7 +222,7 @@ def main(argv=None):
 
     # Initializing the environment
     logger = BriscolaLogger(BriscolaLogger.LoggerLevels.TRAIN)
-    game = brisc.BriscolaGame(2, logger, None, args.winning_reward)
+    game = brisc.BriscolaGame(2, logger, gui_obj=None, bonus=args.winning_reward)
 
     # Initialize agents
     agents = []
@@ -260,13 +261,13 @@ def main(argv=None):
                 epsilon=config['epsilon'],
                 minimum_epsilon=config['minimum_epsilon'],
                 replay_memory_capacity=1000000,
-                minimum_training_samples=2000,
-                batch_size=256,
-                discount=0.95,
-                loss_fn=torch.nn.SmoothL1Loss(),
+                minimum_training_samples=config['minimum_training_samples'],
+                batch_size=config['batch_size'],
+                discount=config['discount'],
+                loss_fn=config['loss_fn'],
                 learning_rate=0.0001,
-                replace_every=1000,
-                epsilon_decay_rate=0.99998,
+                replace_every=config['replace_every'],
+                epsilon_decay_rate=config['epsilon_decay_rate'],
                 layers=config['layers'],
             )
             agent.policy_net.load_state_dict(checkpoint['policy_state_dict'])

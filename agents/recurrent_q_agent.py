@@ -97,7 +97,7 @@ class RecurrentDeepQAgent:
         """The state vector encodes the player's score (points) and four cards.
         Each card is encoded as a vector of length 6:
         first entry: numerical value of the card.
-        second entry: boolean value (1 if brisoscola 0 otherwise).
+        second entry: boolean value (1 if Briscola, 0 otherwise).
         last four entries: one hot encoding of the seeds.
         For example "Asso di bastoni" is encoded as:
         [0, 1, 1, 0, 0, 0] if the briscola is "bastoni".
@@ -117,8 +117,8 @@ class RecurrentDeepQAgent:
             state[seed_index] = 1
 
         for i, card in enumerate(env.played_cards):
-            number_index = i + 3 * features_per_card + value_offset
-            seed_index = i + 3 * features_per_card + seed_offset + card.seed + value_offset
+            number_index = (i + 3) * features_per_card + value_offset
+            seed_index = (i + 3) * features_per_card + seed_offset + card.seed + value_offset
             state[number_index] = card.number
             state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
             state[seed_index] = 1
