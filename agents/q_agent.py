@@ -25,6 +25,7 @@ class QAgent:
             epsilon_decay_rate: float,
             layers: List[int] = [256, 256],
             device=None,
+            state_type=1,
     ) -> None:
         """"""
         self.name = "QLearningAgent"
@@ -68,9 +69,14 @@ class QAgent:
 
         self.loss_log = []
 
+        self.state_type = state_type
+
     def observe(self, env, player):
         """Observes the environment and updates the state"""
-        self.get_state_just_hand(env, player)
+        if self.state_type == 1:
+            self.get_state_just_hand(env, player)
+        elif self.state_type == 2:
+            self.get_state(env, player)
 
     def get_state_just_hand_one_hot_encoding(self, env, player):
         """The state vector encodes 5 cards: the 3 cards in the player's hand,
@@ -119,7 +125,14 @@ class QAgent:
         seed_offset = 2
         features_per_card = 6
         state[0] = player.points
-        state[1] = env.counter
+
+        other_players_points = 0
+        for p in env.players:
+            if p is not player:
+                other_players_points += p.points
+        state[1] = other_players_points
+
+        state[2] = env.counter
 
         for i, card in enumerate(player.hand):
             number_index = i * features_per_card + value_offset

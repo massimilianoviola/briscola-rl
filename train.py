@@ -2,6 +2,8 @@ import os
 import argparse
 import pickle
 import random
+import time
+
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -50,7 +52,8 @@ def train(
         if not os.path.exists(os.path.dirname(save_dir)):
             os.makedirs(os.path.dirname(save_dir))
 
-    for epoch in tqdm(range(1, num_epochs + 1)):
+    start_time = time.time()
+    for epoch in range(1, num_epochs + 1):
         game_winner_id, winner_points, episode_rewards_log = brisc.play_episode(
             game,
             agents,
@@ -74,7 +77,7 @@ def train(
             current_winrate = total_wins[0] / (total_wins[0] + total_wins[1])
             if current_winrate > best_winrate and save:
                 print(f"Saving the checkpoint...\n"
-                      f"New best winrate: {current_winrate * 100}% > {best_winrate * 100}%")
+                      f"New best winrate: {round(current_winrate * 100, 2)}% (Previous: {best_winrate * 100}%)")
                 best_winrate = current_winrate
 
                 checkpoint['config'] = vars(agents[0])
@@ -86,8 +89,9 @@ def train(
 
                 torch.save(checkpoint, save_dir)
                 # agents[0].save(save_dir + "model.pt")
-                print(f"N° rewards updated: {len(checkpoint['rewards'])}\n"
-                      f"Actual epsilon: {agents[0].epsilon}SAVED\n")
+                print(f"New # rewards: {len(checkpoint['rewards'])}\n"
+                      f"Actual epsilon: {round(agents[0].epsilon, 4)}\n"
+                      f"Checkpoint SAVED...\n")
 
             if total_wins[0] > best_total_wins:
                 best_total_wins = total_wins[0]
@@ -99,7 +103,8 @@ def train(
             )
 
         print(f"Episode: {epoch} epsilon: {agents[0].epsilon:.4f}", end="\r")
-
+    end_time = time.time()
+    print("\nComputation time: {:.2f} seconds".format(end_time - start_time))
     # if save:
     #     with open(save_dir + "rewards.pkl", "wb") as f:
     #         pickle.dump(rewards_per_episode, f)
@@ -227,7 +232,7 @@ def main(argv=None):
     # Initialize agents
     agents = []
     agent = QAgent(
-        n_features=26,
+        n_features=27,
         n_actions=3,
         epsilon=args.epsilon,
         minimum_epsilon=args.minimum_epsilon,
@@ -240,6 +245,7 @@ def main(argv=None):
         replace_every=args.replace_every,
         epsilon_decay_rate=args.epsilon_decay_rate,
         layers=[256, 256],
+        state_type=1,
     )
     checkpoint = {
         'config': vars(agent),

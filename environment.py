@@ -543,4 +543,5 @@ def play_episode(game, agents, gui_obj=None, train=True):
     if gui_obj is not None:
         gui_obj.activate_restart(gui_obj)
         gui_obj.reset = False
+
     return *game.end_game(), rewards_log
