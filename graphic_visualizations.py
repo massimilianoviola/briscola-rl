@@ -1,5 +1,10 @@
 import numpy as np
+
+import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib import ticker
+
+matplotlib.use('Agg')
 
 plt.style.use('ggplot')
 
@@ -66,32 +71,39 @@ def evaluate_summary(winners, points, agents, evaluation_dir):
     plt.close()
 
 
+def format_x_tick(x, _):
+    """Custom tick formatter to display 1k instead of 1000."""
+    if x >= 1000:
+        return f'{int(x / 1000)}k'
+    return int(x)
+
+
 def training_summary(x, vict_hist, point_hist, labels, FLAGS, evaluation_dir):
     """Track the evolution of training over time 
     in terms of win percentage and average points obtained.
     """
-    fig, ax = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
-    ax[0].set_title(f"Summary of {FLAGS.num_epochs} epochs", {'size': 21})
+    fig, ax = plt.subplots(figsize=(50, 20), sharex=True)
+    ax.set_title(f"Summary of {len(vict_hist) * FLAGS.evaluate_every} games", {'size': 40}, pad=20)
 
-    y1 = np.asarray(vict_hist).T[0] / FLAGS.num_evaluations
-    y2 = np.asarray(vict_hist).T[1] / FLAGS.num_evaluations
-    ax[0].plot(x, y1, linestyle='--', label=labels[0], color='#8EBA42')
-    ax[0].plot(x, y2, linestyle='--', label=labels[1], color='#E24A33')
-    ax[0].set_ylabel('Win ratio', {'size': 15})
-    ax[0].set_ylim(0, 1)
-    ax[0].hlines(np.mean(y1), x[0], x[-1], alpha=0.2, color='#8EBA42')
-    ax[0].hlines(np.mean(y2), x[0], x[-1], alpha=0.2, color='#E24A33')
-    ax[0].legend()
+    y1 = np.asarray(vict_hist).T[0] / FLAGS.num_evaluation
+    # y2 = np.asarray(vict_hist).T[1] / FLAGS.num_evaluation
+    ax.plot(x, y1, linestyle='--', label=labels[0], color='#8EBA42', linewidth=5)
+    # ax.plot(x, y2, linestyle='--', label=labels[1], color='#E24A33')
+    ax.set_ylabel(f'Win ratio against {FLAGS.against}', {'size': 40})
+    ax.set_ylim(0, 1)
 
-    y1 = np.mean(np.asarray(point_hist)[:, 0, :], 1)
-    y2 = np.mean(np.asarray(point_hist)[:, 1, :], 1)
-    ax[1].plot(x, y1, linestyle='--', label=labels[0], color='#8EBA42')
-    ax[1].plot(x, y2, linestyle='--', label=labels[1], color='#E24A33')
-    ax[1].set_ylabel('Average points obtained', {'size': 15})
-    ax[1].set_xlabel('Epoch', {'size': 15})
-    ax[1].hlines(np.mean(y1), x[0], x[-1], alpha=0.2, color='#8EBA42')
-    ax[1].hlines(np.mean(y2), x[0], x[-1], alpha=0.2, color='#E24A33')
-    ax[1].legend()
+    ax.tick_params(axis='x', labelsize=20)
+    ax.tick_params(axis='y', labelsize=20)
+
+    # Set x-axis ticks at steps of 1000 epochs
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(2000))
+    # Set y-axis ticks at steps of 0.1
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_x_tick))
+
+    # ax.hlines(np.mean(y1), x[0], x[-1], alpha=0.1, color='#8EBA42')
+    # ax.hlines(np.mean(y2), x[0], x[-1], alpha=0.2, color='#E24A33')
+    ax.legend(fontsize="30")
 
     plt.savefig(evaluation_dir)
     plt.close()

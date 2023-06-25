@@ -1,20 +1,19 @@
-import os
 import argparse
-import pickle
+import os
 import random
 import time
 
 import numpy as np
 import torch
-from tqdm import tqdm
 
 import environment as brisc
-import matplotlib.pyplot as plt
-from agents.random_agent import RandomAgent
-from agents.q_agent import QAgent
 from agents.ai_agent import AIAgent
+from agents.q_agent import QAgent
+from agents.random_agent import RandomAgent
 from evaluate import evaluate
 from utils import BriscolaLogger
+
+import graphic_visualizations as gv
 
 
 def train(
@@ -26,6 +25,7 @@ def train(
         save: bool = False,
         save_dir: str = "",
         checkpoint=None,
+        args=None
 ):
     """The agent is trained for num_epochs number of episodes following an
     epsilon-greedy policy. Every evaluate_every number of episodes the agent
@@ -38,7 +38,7 @@ def train(
     best_winrate = 0.0
 
     rewards_per_episode = checkpoint['rewards']
-    print(f"N° actual rewards: {len(rewards_per_episode)}")
+    print(f"Actual # rewards: {len(rewards_per_episode)}")
     points_log = checkpoint['points']
     winrates = checkpoint['winrates']
 
@@ -52,8 +52,8 @@ def train(
         if not os.path.exists(os.path.dirname(save_dir)):
             os.makedirs(os.path.dirname(save_dir))
 
-    start_time = time.time()
     for epoch in range(1, num_epochs + 1):
+
         game_winner_id, winner_points, episode_rewards_log = brisc.play_episode(
             game,
             agents,
@@ -70,6 +70,10 @@ def train(
             for agent in agents:
                 agent.make_greedy()
             total_wins, points_history = evaluate(game, agents, num_evaluations)
+
+            victory_history_1vR.append(total_wins)
+            points_history_1vR.append(points_history)
+
             for agent in agents:
                 agent.restore_epsilon()
             winrates.append(total_wins)
@@ -77,7 +81,7 @@ def train(
             current_winrate = total_wins[0] / (total_wins[0] + total_wins[1])
             if current_winrate > best_winrate and save:
                 print(f"Saving the checkpoint...\n"
-                      f"New best winrate: {round(current_winrate * 100, 2)}% (Previous: {best_winrate * 100}%)")
+                      f"New best winrate: {round(current_winrate * 100, 2)}% (Previous: {round(best_winrate * 100, 2)}%)")
                 best_winrate = current_winrate
 
                 checkpoint['config'] = vars(agents[0])
@@ -96,6 +100,14 @@ def train(
             if total_wins[0] > best_total_wins:
                 best_total_wins = total_wins[0]
 
+            # summary plots
+            x = [evaluate_every * i for i in range(1, 1 + len(victory_history_1vR))]
+            # 1vRandom
+            vict_hist = victory_history_1vR
+            point_hist = points_history_1vR
+            labels = [agents[0].name, agents[1].name]
+            gv.training_summary(x, vict_hist, point_hist, labels, args, f"evaluations/ia/1vR_{int(time.time())}")
+
         # Update target network for Deep Q-learning agent
         if epoch % agents[0].replace_every == 0:
             agents[0].target_net.load_state_dict(
@@ -103,21 +115,17 @@ def train(
             )
 
         print(f"Episode: {epoch} epsilon: {agents[0].epsilon:.4f}", end="\r")
-    end_time = time.time()
-    print("\nComputation time: {:.2f} seconds".format(end_time - start_time))
-    # if save:
-    #     with open(save_dir + "rewards.pkl", "wb") as f:
-    #         pickle.dump(rewards_per_episode, f)
-    #
-    #     with open(save_dir + "winrates.pkl", "wb") as f:
-    #         pickle.dump(winrates, f)
-    #
-    #     with open(save_dir + "points.pkl", "wb") as f:
-    #         pickle.dump(points_log, f)
+
     return best_total_wins, rewards_per_episode
 
 
-def main(argv=None):
+def main():
+    global victory_history_1vR
+    victory_history_1vR = []
+
+    global points_history_1vR
+    points_history_1vR = []
+
     seed = 0
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -166,12 +174,11 @@ def main(argv=None):
         default=1e-4,
     )
 
-    # ----------------------------
     parser.add_argument(
         "--episodes",
         type=int,
         help="Number of training episodes",
-        default=25000,
+        default=90000,
     )
 
     parser.add_argument(
@@ -180,13 +187,12 @@ def main(argv=None):
         help="Number of episode after which evaluate the agent",
         default=1000,
     )
-    # ----------------------------
 
     parser.add_argument(
         "--num_evaluation",
         type=int,
         help="Number of games to perform evaluation",
-        default=200,
+        default=1000,
     )
 
     parser.add_argument(
@@ -200,14 +206,14 @@ def main(argv=None):
         "--against",
         type=str,
         help="Agent to train against",
-        default="RandomAgent",
+        default="AIAgent",
     )
 
     parser.add_argument(
         "--path",
         type=str,
         help="Path where model/data is saved.",
-        default=f"models/{parser.parse_args().agent}.pt",
+        default=f"models/{parser.parse_args().agent}_{int(time.time())}.pt",
     )
 
     parser.add_argument(
@@ -221,7 +227,6 @@ def main(argv=None):
         "--checkpoint_path",
         type=str,
         help="Path of the model checkpoint",
-        default=f"models/{parser.parse_args().agent}.pt",
     )
     args = parser.parse_args()
 
@@ -232,7 +237,6 @@ def main(argv=None):
     # Initialize agents
     agents = []
     agent = QAgent(
-        n_features=27,
         n_actions=3,
         epsilon=args.epsilon,
         minimum_epsilon=args.minimum_epsilon,
@@ -245,7 +249,7 @@ def main(argv=None):
         replace_every=args.replace_every,
         epsilon_decay_rate=args.epsilon_decay_rate,
         layers=[256, 256],
-        state_type=1,
+        state_type=3,
     )
     checkpoint = {
         'config': vars(agent),
@@ -262,7 +266,6 @@ def main(argv=None):
             checkpoint = torch.load(args.checkpoint_path)
             config = checkpoint['config']
             agent = QAgent(
-                n_features=config['n_features'],
                 n_actions=config['n_actions'],
                 epsilon=config['epsilon'],
                 minimum_epsilon=config['minimum_epsilon'],
@@ -275,6 +278,7 @@ def main(argv=None):
                 replace_every=config['replace_every'],
                 epsilon_decay_rate=config['epsilon_decay_rate'],
                 layers=config['layers'],
+                state_type=config['state_type'],
             )
             agent.policy_net.load_state_dict(checkpoint['policy_state_dict'])
         except FileNotFoundError:
@@ -291,6 +295,9 @@ def main(argv=None):
 
     save_model = True if args.path else False
 
+    print("----- TRAINING STARTED -----\n")
+    start_time = time.time()
+
     _, rewards_per_episode = train(
         game,
         agents,
@@ -300,9 +307,21 @@ def main(argv=None):
         save=save_model,
         save_dir=args.path,
         checkpoint=checkpoint,
+        args=args
     )
 
-    print("\nFINISHED TRAINING")
+    end_time = time.time()
+    print("\n----- TRAINING FINISHED -----")
+    print("Computation time: {:.2f} seconds".format(end_time - start_time))
+
+    # summary plots
+    x = [args.evaluate_every * i for i in range(1, 1 + len(victory_history_1vR))]
+
+    # 1vRandom
+    vict_hist = victory_history_1vR
+    point_hist = points_history_1vR
+    labels = [agents[0].name, agents[1].name]
+    gv.training_summary(x, vict_hist, point_hist, labels, args, f"evaluations/ia/1vR")
 
 
 if __name__ == "__main__":

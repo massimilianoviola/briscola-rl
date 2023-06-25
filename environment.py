@@ -1,3 +1,4 @@
+import hashlib
 import random
 import time
 
@@ -29,6 +30,8 @@ class BriscolaDeck:
         self.end_deck = None
         self.briscola = None
         self.deck = None
+        self.seeds = None
+        self.cards_id = {}
         self.create_decklist()
         self.reset()
 
@@ -36,7 +39,7 @@ class BriscolaDeck:
         """Create all the BriscolaCards and add them to the deck."""
         points = [11, 0, 10, 0, 0, 0, 0, 2, 3, 4]
         strengths = [9, 0, 8, 1, 2, 3, 4, 5, 6, 7]
-        seeds = ["Denari", "Coppe", "Spade", "Bastoni"]
+        self.seeds = ["Denari", "Coppe", "Spade", "Bastoni"]
         names = [
             "Asso",
             "Due",
@@ -52,7 +55,7 @@ class BriscolaDeck:
 
         self.deck = []
         id = 0
-        for s, seed in enumerate(seeds):
+        for s, seed in enumerate(self.seeds):
             for n, name in enumerate(names):
                 card = BriscolaCard()
                 card.id = id
@@ -63,6 +66,15 @@ class BriscolaDeck:
                 card.points = points[n]
                 self.deck.append(card)
                 id += 1
+
+        for i, card in enumerate(self.deck):
+            self.cards_id[i] = card.name
+
+    def get_card_index(self, card):
+        return [i for i in self.cards_id if self.cards_id[i] == card.name][0]
+
+    def get_card_id(self, card):
+        return [(card.number + 1) / 10, (card.seed + 1) / 4]
 
     def reset(self):
         """Prepare the deck for a new game."""
@@ -483,22 +495,23 @@ def play_episode(game, agents, gui_obj=None, train=True):
 
             # ---GUI ---
             # waiting some time before the agent plays a card (just to simulate some thinking)
-            wait_time = 500  # in ms
-            if gui_obj is not None and player_id == 0:
-                gui_obj.notify_after(wait_time)
-                with gui_obj.cond:
-                    gui_obj.cond.wait()
-            if gui_obj is not None and player_id == 1:
-                if i == 0:
+            if gui_obj is not None:
+                wait_time = 500  # in ms
+                if player_id == 0:
                     gui_obj.notify_after(wait_time)
                     with gui_obj.cond:
                         gui_obj.cond.wait()
-                    gui_obj.agent_play_card(action)
-                else:
-                    gui_obj.agent_play_card(action)
-                    gui_obj.notify_after(wait_time)
-                    with gui_obj.cond:
-                        gui_obj.cond.wait()
+                elif player_id == 1:
+                    if i == 0:
+                        gui_obj.notify_after(wait_time)
+                        with gui_obj.cond:
+                            gui_obj.cond.wait()
+                        gui_obj.agent_play_card(action)
+                    else:
+                        gui_obj.agent_play_card(action)
+                        gui_obj.notify_after(wait_time)
+                        with gui_obj.cond:
+                            gui_obj.cond.wait()
 
             # Update agents deck since it can only observe the environment when
             # it's its turn. So for example if it's the first one to play he
@@ -509,9 +522,11 @@ def play_episode(game, agents, gui_obj=None, train=True):
             # first in agents.                                                 #
             # THIS PART SHOULD be updated to work in all scenarios             #
             ####################################################################
-            for card in game.played_cards:
-                if agents[0].name == "QLearningAgent" or agents[0].name == "PPOAgent":
+            if agents[0].name == "QLearningAgent" or agents[0].name == "PPOAgent":
+                for card in game.played_cards:
                     agents[0].deck[card.number][card.seed] = 1
+                    if card.seed == game.briscola.seed:
+                        agents[0].briscola_vector[card.number] = 1
 
         # update the environment
         rewards, winner_id = game.get_rewards_from_step()

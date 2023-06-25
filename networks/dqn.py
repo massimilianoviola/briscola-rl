@@ -35,11 +35,11 @@ class DQN(nn.Module):
     """Simple feed-forward neural network with two fully connected layers"""
 
     def __init__(
-        self,
-        input_dim: int,
-        output_dim: int,
-        layers: List[int] = [256, 256],
-        activation=nn.ReLU(),
+            self,
+            input_dim: int,
+            output_dim: int,
+            layers,
+            activation=nn.ReLU(),
     ) -> None:
         """
         :param input_dim: size of the state vector

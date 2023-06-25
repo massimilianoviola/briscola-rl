@@ -5,13 +5,14 @@ import torch.optim as optim
 from networks.dqn import ReplayMemory, DQN
 from typing import List
 
+from utils import convert_to_binary_list, overwrite_values
+
 
 class QAgent:
     """Q-learning agent"""
 
     def __init__(
             self,
-            n_features: int,
             n_actions: int,
             replay_memory_capacity: int,
             minimum_training_samples: int,
@@ -23,11 +24,13 @@ class QAgent:
             epsilon: float,
             minimum_epsilon: float,
             epsilon_decay_rate: float,
-            layers: List[int] = [256, 256],
+            layers=None,
             device=None,
             state_type=1,
     ) -> None:
         """"""
+        if layers is None:
+            layers = [256, 256]
         self.name = "QLearningAgent"
 
         if device is None:
@@ -35,7 +38,14 @@ class QAgent:
         else:
             self.device = device
 
-        self.n_features = n_features
+        self.state_type = state_type
+        if self.state_type == 1:
+            self.n_features = 26
+        elif self.state_type == 2:
+            self.n_features = 66
+        elif self.state_type == 3:
+            self.n_features = 30
+
         self.n_actions = n_actions
 
         self.last_state = None
@@ -43,7 +53,8 @@ class QAgent:
         self.reward = None
         self.state = None
 
-        self.deck = np.zeros((10, 4))
+        self.deck = np.zeros((10, 4)).astype(int)
+        self.briscola_vector = np.zeros(10).astype(int)
 
         self.epsilon = epsilon
         self.minimum_epsilon = minimum_epsilon
@@ -55,8 +66,8 @@ class QAgent:
         self.batch_size = batch_size
 
         self.layers = layers
-        self.policy_net = DQN(n_features, n_actions, layers).to(self.device)
-        self.target_net = DQN(n_features, n_actions, layers).to(self.device)
+        self.policy_net = DQN(self.n_features, n_actions, layers).to(self.device)
+        self.target_net = DQN(self.n_features, n_actions, layers).to(self.device)
 
         self.loss_fn = loss_fn
         self.optimizer = optim.RMSprop(
@@ -68,8 +79,7 @@ class QAgent:
         self.replace_every = replace_every
 
         self.loss_log = []
-
-        self.state_type = state_type
+        self.done = None
 
     def observe(self, env, player):
         """Observes the environment and updates the state"""
@@ -77,6 +87,8 @@ class QAgent:
             self.get_state_just_hand(env, player)
         elif self.state_type == 2:
             self.get_state(env, player)
+        elif self.state_type == 3:
+            self.get_au_state(env, player)
 
     def get_state_just_hand_one_hot_encoding(self, env, player):
         """The state vector encodes 5 cards: the 3 cards in the player's hand,
@@ -115,7 +127,7 @@ class QAgent:
         """The state vector encodes the player's score (points) and four cards.
         Each card is encoded as a vector of length 6:
         first entry: numerical value of the card.
-        second entry: boolean value (1 if Briscola, 0 otherwise).
+        second entry: boolean value (1 if brisoscola 0 otherwise).
         last four entries: one hot encoding of the seeds.
         For example "Asso di bastoni" is encoded as:
         [0, 1, 1, 0, 0, 0] if the briscola is "bastoni".
@@ -125,14 +137,7 @@ class QAgent:
         seed_offset = 2
         features_per_card = 6
         state[0] = player.points
-
-        other_players_points = 0
-        for p in env.players:
-            if p is not player:
-                other_players_points += p.points
-        state[1] = other_players_points
-
-        state[2] = env.counter
+        state[1] = env.counter
 
         for i, card in enumerate(player.hand):
             number_index = i * features_per_card + value_offset
@@ -142,10 +147,38 @@ class QAgent:
             state[seed_index] = 1
 
         for i, card in enumerate(env.played_cards):
-            number_index = (i + 3) * features_per_card + value_offset
-            seed_index = (i + 3) * features_per_card + seed_offset + card.seed + value_offset
+            number_index = i + 3 * features_per_card + value_offset
+            seed_index = i + 3 * features_per_card + seed_offset + card.seed + value_offset
             state[number_index] = card.number
             state[number_index + 1] = 1 if card.seed == env.briscola.seed else 0
+            state[seed_index] = 1
+
+        self.last_state = self.state
+        self.state = state
+        self.done = env.check_end_game()
+
+    def get_au_state(self, env, player):
+        state = np.zeros(self.n_features)
+        value_offset = 2
+        seed_offset = 3
+        features_per_card = 7
+        state[0] = player.points
+        state[1] = env.counter
+
+        for i, card in enumerate(player.hand):
+            number_index = i * features_per_card + value_offset
+            seed_index = i * features_per_card + seed_offset + card.seed + value_offset
+            state[number_index] = card.points
+            state[number_index + 1] = card.number
+            state[number_index + 2] = 1 if card.seed == env.briscola.seed else 0
+            state[seed_index] = 1
+
+        for i, card in enumerate(env.played_cards):
+            number_index = i + 3 * features_per_card + value_offset
+            seed_index = i + 3 * features_per_card + seed_offset + card.seed + value_offset
+            state[number_index] = card.points
+            state[number_index + 1] = card.number
+            state[number_index + 2] = 1 if card.seed == env.briscola.seed else 0
             state[seed_index] = 1
 
         self.last_state = self.state
@@ -192,6 +225,7 @@ class QAgent:
 
     def select_action(self, available_actions):
         """Selects action according to an epsilon-greedy policy"""
+        action = None
         state = torch.from_numpy(self.state).float().to(self.device)
         if np.random.uniform() < self.epsilon:
             # Select a random action with probability epsilon
@@ -303,7 +337,8 @@ class QAgent:
         self.epsilon *= self.epsilon_decay_rate
 
     def reset(self):
-        self.deck = np.zeros((10, 4))
+        self.deck = np.zeros((10, 4)).astype(int)
+        self.briscola_vector = np.zeros(10).astype(int)
 
     def save(self, path):
         """Saves policy network's state dictionary to path"""

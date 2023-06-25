@@ -53,3 +53,18 @@ class PlayerState:
     HAND_PLAYED_BRISCOLA = 'hand_played_briscola'
     HAND_PLAYED_BRISCOLASEED = 'hand_played_briscolaseed'
     HAND_PLAYED_BRISCOLA_HISTORY = 'hand_played_briscola_history'
+
+
+def convert_to_binary_list(decimal_number, max_bits):
+    if decimal_number > 2 ** max_bits - 1:
+        raise ValueError
+    binary_number = bin(decimal_number)[2:]  # Convert decimal to binary and remove the '0b' prefix
+    # Pad the binary number with leading zeros to ensure a length of 7 bits
+    binary_number = binary_number.zfill(max_bits)
+    # Store each bit in a list
+    binary_list = [int(bit) for bit in binary_number]
+    return binary_list
+
+
+def overwrite_values(start_index, target_vector, values_list):
+    target_vector[start_index:start_index + len(values_list)] = values_list
