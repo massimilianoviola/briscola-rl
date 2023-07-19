@@ -112,7 +112,7 @@ class BriscolaGui:
                  '29_Cavallo_di_spade.jpg', '30_Re_di_spade.jpg', '31_Asso_di_bastoni.jpg', '32_Due_di_bastoni.jpg',
                  '33_Tre_di_bastoni.jpg', '34_Quattro_di_bastoni.jpg', '35_Cinque_di_bastoni.jpg',
                  '36_Sei_di_bastoni.jpg', '37_Sette_di_bastoni.jpg', '38_Fante_di_bastoni.jpg',
-                 '39_Cavallo_di_bastoni.jpg', '40_Re_di_bastoni.jpg', 'Carte_Napoletane_retro.jpg', 'Deck_Finito.jpg']
+                 '39_Cavallo_di_bastoni.jpg', '40_Re_di_bastoni.jpg', 'Carte_Napoletane_retro.jpg']
         for filename in names:
             img_path = resource_path("card_images/" + filename)
             img = Image.open(img_path).resize(self.image_size, resample=Resampling.LANCZOS)
@@ -540,7 +540,7 @@ if __name__ == '__main__':
 
     parser.add_argument(
         "--model_dir",
-        default=None,
+        default="../models/QLearningAgent_90k_71.2%_ruled.pt",
         help="Trained model path if you want to play against a deep agent",
         type=str,
     )
@@ -550,10 +550,10 @@ if __name__ == '__main__':
     briscola_gui = BriscolaGui()
 
     if FLAGS.model_dir:
+        print("Loading agent...")
         checkpoint = torch.load(FLAGS.model_dir)
         config = checkpoint['config']
         agent = QAgent(
-            n_features=config['n_features'],
             n_actions=config['n_actions'],
             epsilon=config['epsilon'],
             minimum_epsilon=config['minimum_epsilon'],
@@ -566,9 +566,9 @@ if __name__ == '__main__':
             replace_every=1000,
             epsilon_decay_rate=0.99998,
             layers=config['layers'],
+            state_type=config['state_type']
         )
         agent.policy_net.load_state_dict(checkpoint['policy_state_dict'])
-        print(agent.deck)
         # agent.load(FLAGS.model_dir)
         agent.make_greedy()
         briscola_gui.agent = agent

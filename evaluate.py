@@ -66,13 +66,13 @@ def main(args=None):
     print(f"Testing against RandomAgent on {args.num_evaluations} games")
     agents = [agent, RandomAgent()]
     total_wins, points_history = evaluate(game, agents, FLAGS.num_evaluations)
-    stats_plotter(agents, points_history, total_wins)
+    # stats_plotter(agents, points_history, total_wins)
 
     # test agent against AIAgent
     print(f"Testing against AIAgent on {args.num_evaluations} games")
     agents = [agent, AIAgent()]
     total_wins, points_history = evaluate(game, agents, FLAGS.num_evaluations)
-    stats_plotter(agents, points_history, total_wins)
+    # stats_plotter(agents, points_history, total_wins)
 
 
 if __name__ == '__main__':
@@ -81,11 +81,11 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--model_dir", default="models/QLearningAgent_25k_66.7%_ruled.pt",
+    parser.add_argument("--model_dir", default="models/QLearningAgent_90k_ruled_state3.pt",
                         help="Provide a trained model path if you want to play against a deep agent", type=str)
     parser.add_argument("--network", default=NetworkTypes.DQN, choices=[NetworkTypes.DQN, NetworkTypes.DRQN],
                         help="Neural network used for approximating value function")
-    parser.add_argument("--num_evaluations", default=10000,
+    parser.add_argument("--num_evaluations", default=20000,
                         help="Number of evaluation games against each type of opponent for each test", type=int)
 
     FLAGS = parser.parse_args()

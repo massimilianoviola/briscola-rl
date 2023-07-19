@@ -220,7 +220,7 @@ def main():
         "--winning_reward",
         type=int,
         help="Extra reward given for winning the game",
-        default=100,
+        default=0,
     )
 
     parser.add_argument(

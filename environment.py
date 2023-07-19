@@ -452,7 +452,7 @@ def play_episode(game, agents, gui_obj=None, train=True):
 
     players_order = None
 
-    # ---GUI ---
+    # --- GUI ---
     # game reset is called from the GUI, that's why we avoid recalling it here in case we use the GUI
     if gui_obj is None:
         game.reset()
@@ -484,7 +484,7 @@ def play_episode(game, agents, gui_obj=None, train=True):
             available_actions = game.get_player_actions(player_id)
             if agent.name == "HumanAgent":
                 action = agent.select_action(available_actions, gui_obj)
-                # ---GUI ---
+                # --- GUI ---
                 # if the user presses "restart" the function "play_episode" returns and a new thread can be created
                 if action == -1:
                     return
@@ -493,7 +493,7 @@ def play_episode(game, agents, gui_obj=None, train=True):
 
             game.play_step(action, player_id)
 
-            # ---GUI ---
+            # --- GUI ---
             # waiting some time before the agent plays a card (just to simulate some thinking)
             if gui_obj is not None:
                 wait_time = 500  # in ms
@@ -534,7 +534,7 @@ def play_episode(game, agents, gui_obj=None, train=True):
         # for i, player_id in enumerate(game.get_players_order()):
         # print(f"{agents[player_id].name} gets reward {rewards[i]}")
 
-        # ---GUI ---
+        # --- GUI ---
         # removing the two played cards from the table
         if gui_obj is not None:
             gui_obj.notify_after(700)
